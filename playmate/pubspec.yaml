@@ -1,0 +1,65 @@
+name: playmate
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_dotenv: ^5.1.0
+  http: ^1.2.1
+  shared_preferences: ^2.2.2
+  image_picker: ^1.0.7
+  crop_your_image: ^1.0.6
+
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.3.3
+  flutter_native_splash: ^2.4.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - .env
+    - assets/images/logo.png
+    - assets/images/brand.png
+    - assets/images/splash-gradient.png
+
+flutter_native_splash:
+#  color: "#0D766F"
+  background_image: assets/images/splash-gradient.png
+
+  image: assets/images/brand.png
+  image_dark: assets/images/brand.png
+
+  android_gravity: center
+  ios_content_mode: center
+  fullscreen: true
+  web: false
+
+  android: true
+  ios: true
+
+  android_12:
+    background_image: assets/images/splash-gradient.png
+    image: assets/images/brand.png
+#    icon_background_color: "#0D766F"
+
+
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/icon.png"
