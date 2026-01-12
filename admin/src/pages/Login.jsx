@@ -12,7 +12,7 @@ export default function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const { backendUrl, token, setToken } = useContext(AppContext);
+    const { backendUrl, aToken, setaToken } = useContext(AppContext);
 
     const [errors, setErrors] = useState({ email: "", password: "" });
     const [isLoading, setIsLoading] = useState(false);
@@ -46,21 +46,21 @@ export default function Login() {
         if (!validateForm()) return;
 
         setIsLoading(true);
-        setShowPassword(false);
+
         try {
-            const response = await axios.post(`${backendUrl}/venue/login`, { email: email.trim(), password: password.trim() });
+            const response = await axios.post(`${backendUrl}/auth/admin-login`, { email: email.trim(), password: password.trim() });
             console.log(response);
-            const { token } = response.data;
+            const aToken = response.data.token;
 
             if (response.status !== 200) {
                 toast.error(response.data.message);
                 return;
             }
 
-            setToken(token);
-            localStorage.setItem("token", token);
+            setaToken(aToken);
+            localStorage.setItem("aToken", aToken);
 
-            navigate("/dashboard");
+            navigate("/admin-dashboard");
             toast.success("Login successful");
             setEmail("");
             setPassword("");
@@ -69,7 +69,6 @@ export default function Login() {
             const message =
                 error?.response?.data?.message ||
                 "Something went wrong. Please try again.";
-            console.log(error)
             toast.error(message);
         } finally {
             setIsLoading(false);
@@ -97,7 +96,7 @@ export default function Login() {
 
     const underlineVariants = {
         hidden: { width: 0 },
-        visible: { width: "46%", transition: { duration: 0.9, ease: "easeInOut" } },
+        visible: { width: "100%", transition: { duration: 0.8 } },
     };
 
     const stateChangeVariants = {
@@ -130,7 +129,7 @@ export default function Login() {
                     <motion.div variants={itemVariants}>
                         <AnimatePresence mode="wait">
                             <motion.h2
-                                key="venue"
+                                key="admin"
                                 className="text-2xl font-semibold text-gray-800"
                                 variants={stateChangeVariants}
                                 initial="initial"
@@ -138,7 +137,7 @@ export default function Login() {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: "easeInOut" }}
                             >
-                                Venue Owner <span className="text-primary">Login</span>
+                                Admin <span className="text-primary">Login</span>
                             </motion.h2>
                         </AnimatePresence>
                     </motion.div>
