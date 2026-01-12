@@ -24,7 +24,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _profileImage = '';
   String _userId = '';
   List<Map<String, dynamic>> _userSports = [];
+  List<Map<String, dynamic>> _availableSports = [];
   bool _isLoadingProfile = true;
+  bool _isLoadingSports = false;
+  int _nextUserSportId = 1; // For generating unique IDs
 
   final Map<String, IconData> _sportIcons = {
     'Football': Icons.sports_soccer,
@@ -44,11 +47,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadUserProfile();
+    _loadAvailableSports();
   }
 
   Future<void> _loadUserProfile() async {
     setState(() => _isLoadingProfile = true);
-    
+
     try {
       final base = dotenv.env['BASE_URL'] ?? '';
       final prefs = await SharedPreferences.getInstance();
@@ -60,7 +64,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() => _isLoadingProfile = false);
         return;
       }
-      
+
       final uri = Uri.parse('$base/user/profile/$userId');
       final resp = await http.get(
         uri,
@@ -75,21 +79,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         final userData = data['data']['user'];
-        
+
         // Update SharedPreferences with latest data
         await prefs.setString('first_name', userData['first_name'] ?? '');
         await prefs.setString('last_name', userData['last_name'] ?? '');
         await prefs.setString('user_email', userData['user_email'] ?? '');
         await prefs.setString('profile_image', userData['profile_image'] ?? '');
         await prefs.setString('user_id', userData['user_id'].toString());
-        
+
         setState(() {
           _firstName = userData['first_name'] ?? '';
           _lastName = userData['last_name'] ?? '';
           _userEmail = userData['user_email'] ?? '';
           _profileImage = userData['profile_image'] ?? '';
           _userId = userData['user_id'].toString();
-          _userSports = List<Map<String, dynamic>>.from(userData['sports'] ?? []);
+          _userSports = List<Map<String, dynamic>>.from(
+            userData['sports'] ?? [],
+          );
         });
       }
     } catch (e) {
@@ -99,13 +105,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _loadAvailableSports() async {
+    setState(() => _isLoadingSports = true);
+
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final uri = Uri.parse('$base/sports/getAllSports');
+      final resp = await http.get(uri);
+
+      debugPrint('Sports API response: ${resp.statusCode} - ${resp.body}');
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final sportsData = data['data'];
+
+        if (sportsData != null && sportsData['sports'] != null) {
+          setState(() {
+            _availableSports = List<Map<String, dynamic>>.from(
+              sportsData['sports'].map(
+                (sport) => {
+                  'sport_id': sport['sport_id'],
+                  'sport_name': sport['sport_name'],
+                },
+              ),
+            );
+          });
+          debugPrint('Loaded ${_availableSports.length} sports from API');
+        } else {
+          debugPrint('No sports data found in response');
+        }
+      } else {
+        debugPrint('Failed to load sports: ${resp.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error loading available sports: $e');
+    } finally {
+      setState(() => _isLoadingSports = false);
+    }
+  }
+
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Logout',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -152,6 +195,262 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _addSport(int sportId, String skillLevel) {
+    // Find the sport name from available sports
+    final sport = _availableSports.firstWhere(
+      (s) => s['sport_id'] == sportId,
+      orElse: () => {'sport_id': sportId, 'sport_name': 'Unknown'},
+    );
+
+    // Check if sport already exists
+    final alreadyExists = _userSports.any((s) => s['sport_id'] == sportId);
+    if (alreadyExists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This sport is already added'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Add sport to user's list
+    setState(() {
+      _userSports.add({
+        'user_sport_id': _nextUserSportId++,
+        'sport_id': sportId,
+        'sport_name': sport['sport_name'],
+        'skill_level': skillLevel,
+      });
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sport added successfully'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _deleteSport(int userSportId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Remove Sport',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Are you sure you want to remove this sport?',
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Remove',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Remove sport from local list
+    setState(() {
+      _userSports.removeWhere((sport) => sport['user_sport_id'] == userSportId);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sport removed successfully'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _showAddSportDialog() {
+    int? selectedSportId;
+    String selectedSkillLevel = 'Beginner';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Add Sport',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select Sport',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Show loading or empty state
+                if (_availableSports.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber,
+                          color: Colors.orange[700],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'No sports available. Check console for details.',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.orange[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: themeColor.withOpacity(0.3)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: selectedSportId,
+                        isExpanded: true,
+                        hint: Text(
+                          'Choose a sport',
+                          style: GoogleFonts.poppins(fontSize: 14),
+                        ),
+                        icon: Icon(Icons.arrow_drop_down, color: themeColor),
+                        items: _availableSports.map((sport) {
+                          final sportId = sport['sport_id'] as int;
+                          final sportName = sport['sport_name'] as String;
+                          return DropdownMenuItem<int>(
+                            value: sportId,
+                            child: Text(
+                              sportName,
+                              style: GoogleFonts.poppins(fontSize: 14),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setDialogState(() => selectedSportId = value);
+                        },
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+                Text(
+                  'Skill Level',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ['Beginner', 'Intermediate', 'Pro']
+                      .map(
+                        (level) => ChoiceChip(
+                          label: Text(level),
+                          selected: selectedSkillLevel == level,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setDialogState(() => selectedSkillLevel = level);
+                            }
+                          },
+                          selectedColor: themeColor,
+                          labelStyle: GoogleFonts.poppins(
+                            color: selectedSkillLevel == level
+                                ? Colors.white
+                                : Colors.black87,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: (selectedSportId == null || _availableSports.isEmpty)
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      _addSport(selectedSportId!, selectedSkillLevel);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: themeColor,
+                disabledBackgroundColor: Colors.grey,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Add',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color _getSkillLevelColor(String level) {
     switch (level.toLowerCase()) {
       case 'beginner':
@@ -195,12 +494,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: CircleAvatar(
               radius: 60,
               backgroundColor: Colors.white,
-              backgroundImage: _profileImage.isNotEmpty 
-                ? NetworkImage(_profileImage) 
-                : null,
-              child: _profileImage.isEmpty 
-                ? Icon(Icons.person, color: themeColor, size: 60)
-                : null,
+              backgroundImage: _profileImage.isNotEmpty
+                  ? NetworkImage(_profileImage)
+                  : null,
+              child: _profileImage.isEmpty
+                  ? Icon(Icons.person, color: themeColor, size: 60)
+                  : null,
             ),
           ),
           const SizedBox(height: 16),
@@ -223,7 +522,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Edit Profile Button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -284,39 +583,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Sports & Skills
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.sports_tennis, color: themeColor, size: 24),
-              const SizedBox(width: 8),
               Text(
-                'My Sports',
+                'Sports & Skills',
                 style: GoogleFonts.poppins(
                   fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: Colors.black87,
                 ),
               ),
+              IconButton(
+                onPressed: _showAddSportDialog,
+                icon: Icon(Icons.add_circle, color: themeColor, size: 28),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          
+          const SizedBox(height: 12),
+
           if (_userSports.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
                 child: Column(
                   children: [
                     Icon(
-                      Icons.sports_outlined,
+                      Icons.sports_tennis,
                       size: 48,
                       color: Colors.grey[300],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
-                      'No sports added yet',
+                      'No sports added',
                       style: GoogleFonts.poppins(
-                        color: Colors.grey[600],
                         fontSize: 14,
+                        color: Colors.grey[600],
                       ),
                     ),
                   ],
@@ -324,81 +631,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             )
           else
-            ListView.separated(
+            ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _userSports.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final sport = _userSports[index];
-                final sportName = sport['sport_name'] ?? 'Unknown';
-                final skillLevel = sport['skill_level'] ?? 'Beginner';
-                
+                final userSport = _userSports[index];
+                final sportName = userSport['sport_name'] ?? 'Unknown';
+                final skillLevel = userSport['skill_level'] ?? 'Beginner';
+
                 return Container(
-                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _getSkillLevelColor(skillLevel).withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: themeColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          _sportIcons[sportName] ?? Icons.sports,
-                          color: themeColor,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              sportName,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Skill Level',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getSkillLevelColor(skillLevel).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          skillLevel,
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _getSkillLevelColor(skillLevel),
-                          ),
-                        ),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
                       ),
                     ],
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: themeColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        _sportIcons[sportName] ?? Icons.sports,
+                        color: themeColor,
+                        size: 28,
+                      ),
+                    ),
+                    title: Text(
+                      sportName,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    subtitle: Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getSkillLevelColor(skillLevel).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        skillLevel,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: _getSkillLevelColor(skillLevel),
+                        ),
+                      ),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      onPressed: () {
+                        _deleteSport(userSport['user_sport_id']);
+                      },
+                    ),
                   ),
                 );
               },
@@ -435,18 +738,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: (iconColor ?? themeColor).withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            color: iconColor ?? themeColor,
-            size: 22,
-          ),
+          child: Icon(icon, color: iconColor ?? themeColor, size: 22),
         ),
         title: Text(
           title,
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
         ),
         subtitle: subtitle != null
             ? Text(
@@ -468,9 +764,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F8F3),
       body: _isLoadingProfile
-          ? Center(
-              child: CircularProgressIndicator(color: themeColor),
-            )
+          ? Center(child: CircularProgressIndicator(color: themeColor))
           : RefreshIndicator(
               onRefresh: _loadUserProfile,
               color: themeColor,
@@ -480,12 +774,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildProfileHeader(),
-                    
+
                     // Sports Section
                     _buildSportsSection(),
-                    
+
                     const SizedBox(height: 8),
-                    
+
                     // Settings Section
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -498,7 +792,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
-                    
+
                     _buildMenuItem(
                       icon: Icons.lock_outline,
                       title: 'Change Password',
@@ -528,9 +822,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         // Navigate to location settings
                       },
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Support Section
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -543,7 +837,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
-                    
+
                     _buildMenuItem(
                       icon: Icons.help_outline,
                       title: 'Help & Support',
@@ -567,9 +861,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         // Navigate to privacy policy
                       },
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Logout Button
                     _buildMenuItem(
                       icon: Icons.logout,
@@ -578,7 +872,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       iconColor: Colors.red,
                       onTap: _logout,
                     ),
-                    
+
                     const SizedBox(height: 80),
                   ],
                 ),
