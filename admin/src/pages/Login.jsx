@@ -48,7 +48,7 @@ export default function Login() {
         setIsLoading(true);
 
         try {
-            const response = await axios.post(`${backendUrl}/auth/admin-login`, { email: email.trim(), password: password.trim() });
+            const response = await axios.post(`${backendUrl}/admin/admin-login`, { email: email.trim(), password: password.trim() });
             console.log(response);
             const aToken = response.data.token;
 
