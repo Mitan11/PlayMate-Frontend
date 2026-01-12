@@ -58,7 +58,8 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: const Color(0xFFF3F8F3),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 2,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         shadowColor: themeColor.withOpacity(0.1),
         title: Text(
           'PlayMate',
@@ -86,21 +87,21 @@ class _HomeScreenState extends State<HomeScreen> {
               child: CircleAvatar(
                 radius: 18,
                 backgroundColor: Colors.green.shade100,
-                backgroundImage: _profileImage.isNotEmpty 
-                  ? NetworkImage(_profileImage) 
-                  : null,
-                child: _profileImage.isEmpty 
-                  ? Icon(Icons.person, color: themeColor, size: 20)
-                  : null,
+                backgroundImage: _profileImage.isNotEmpty
+                    ? NetworkImage(_profileImage)
+                    : null,
+                child: _profileImage.isEmpty
+                    ? Icon(Icons.person, color: themeColor, size: 20)
+                    : null,
               ),
             ),
           ),
         ],
       ),
-      body: _selectedIndex == 0 
-        ? _buildHomeTab() 
-        : _selectedIndex == 3 
-          ? const ProfileScreen() 
+      body: _selectedIndex == 0
+          ? _buildHomeTab()
+          : _selectedIndex == 3
+          ? const ProfileScreen()
           : _buildPlaceholder(),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -121,9 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
-          unselectedLabelStyle: GoogleFonts.poppins(
-            fontSize: 11,
-          ),
+          unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11),
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           items: const <BottomNavigationBarItem>[
@@ -182,12 +181,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 32,
                   backgroundColor: Colors.white,
-                  backgroundImage: _profileImage.isNotEmpty 
-                    ? NetworkImage(_profileImage) 
-                    : null,
-                  child: _profileImage.isEmpty 
-                    ? Icon(Icons.person, color: themeColor, size: 32)
-                    : null,
+                  backgroundImage: _profileImage.isNotEmpty
+                      ? NetworkImage(_profileImage)
+                      : null,
+                  child: _profileImage.isEmpty
+                      ? Icon(Icons.person, color: themeColor, size: 32)
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -270,7 +269,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           CircleAvatar(
                             radius: 20,
                             backgroundColor: Colors.green.shade100,
-                            child: Icon(Icons.person, color: themeColor, size: 20),
+                            child: Icon(
+                              Icons.person,
+                              color: themeColor,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -304,9 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     Container(
                       height: 200,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                      ),
+                      decoration: BoxDecoration(color: Colors.grey[200]),
                       child: Center(
                         child: Icon(
                           Icons.sports_tennis,
@@ -361,11 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.construction,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.construction, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'Coming Soon',
