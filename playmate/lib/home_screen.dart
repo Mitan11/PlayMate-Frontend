@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:playmate/login_screen.dart';
 import 'package:playmate/profile_screen.dart';
+import 'package:playmate/create_post_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,7 +29,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userName = '${prefs.getString('first_name') ?? 'User'} ${prefs.getString('last_name') ?? ''}';
+      _userName =
+          '${prefs.getString('first_name') ?? 'User'} ${prefs.getString('last_name') ?? ''}';
       _userEmail = prefs.getString('user_email') ?? '';
       _profileImage = prefs.getString('profile_image') ?? '';
     });
@@ -72,7 +74,14 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.add_circle_outline, color: themeColor),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CreatePostScreen(),
+                ),
+              );
+            },
           ),
           IconButton(
             icon: Icon(Icons.notifications_outlined, color: themeColor),
