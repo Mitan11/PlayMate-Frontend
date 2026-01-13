@@ -5,8 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -33,6 +37,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   String? _firstNameError;
   String? _lastNameError;
+  String? _pickedImagePath;
+  File? _croppedImageFile;
 
   @override
   void initState() {
@@ -51,17 +57,85 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> pickImage() async {
+    // Show dialog to choose between camera and gallery
+    final ImageSource? source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Choose Image Source',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: themeColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.camera_alt, color: themeColor),
+              ),
+              title: Text(
+                'Camera',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: themeColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.photo_library, color: themeColor),
+              ),
+              title: Text(
+                'Gallery',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     try {
-      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 85, // Compress to 85% quality
+      );
+
       if (pickedFile == null) return;
 
+      setState(() {
+        _pickedImagePath = pickedFile.path;
+        _selectedImageBytes = null;
+        _isCropping = true;
+      });
+
+      // Load bytes ONLY for cropping preview
       final bytes = await pickedFile.readAsBytes();
       setState(() {
         _selectedImageBytes = bytes;
-        _isCropping = true;
       });
     } catch (e) {
       debugPrint('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -103,12 +177,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       request.fields['first_name'] = firstName;
       request.fields['last_name'] = lastName;
 
-      if (_profileImageBytes != null) {
+      if (_croppedImageFile != null) {
+        final String path = _croppedImageFile!.path;
+        final String extension = path.split('.').last.toLowerCase();
+        MediaType contentType;
+
+        switch (extension) {
+          case 'png':
+            contentType = MediaType('image', 'png');
+            break;
+          case 'gif':
+            contentType = MediaType('image', 'gif');
+            break;
+          case 'webp':
+            contentType = MediaType('image', 'webp');
+            break;
+          case 'bmp':
+            contentType = MediaType('image', 'bmp');
+            break;
+          case 'jpg':
+          case 'jpeg':
+          default:
+            contentType = MediaType('image', 'jpeg');
+            break;
+        }
+
         request.files.add(
-          http.MultipartFile.fromBytes(
+          await http.MultipartFile.fromPath(
             'profile_image',
-            _profileImageBytes!,
-            filename: 'profile.jpg',
+            path,
+            contentType: contentType,
           ),
         );
       }
@@ -192,9 +290,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     controller: _cropController,
                     image: _selectedImageBytes!,
                     aspectRatio: 1,
-                    onCropped: (croppedBytes) {
+                    onCropped: (croppedBytes) async {
+                      final decodedImage = img.decodeImage(croppedBytes);
+
+                      if (decodedImage == null) {
+                        debugPrint('Image decode failed');
+                        return;
+                      }
+                      final jpgBytes = img.encodeJpg(decodedImage, quality: 85);
+
+                      final dir = await getTemporaryDirectory();
+                      final file = File('${dir.path}/profile.jpg');
+                      await file.writeAsBytes(jpgBytes);
+
                       setState(() {
-                        _profileImageBytes = croppedBytes;
+                        _croppedImageFile = file; 
+                        _profileImageBytes = Uint8List.fromList(
+                          jpgBytes,
+                        ); 
                         _isCropping = false;
                       });
                     },
