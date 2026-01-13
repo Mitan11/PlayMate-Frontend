@@ -5,9 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:playmate/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -28,15 +32,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final ImagePicker _picker = ImagePicker();
   final CropController _cropController = CropController();
 
-  Uint8List? _selectedImageBytes;  // original picked image
+  Uint8List? _selectedImageBytes; // original picked image
   Uint8List? _profileImageBytes; // final cropped image
   bool _isCropping = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  File? _croppedImageFile;
 
   // Default avatar URL
-  final String _defaultAvatarUrl = 'https://res.cloudinary.com/dsw5tkkyr/image/upload/v1764845539/avatar_wcaknk.png';
+  final String _defaultAvatarUrl =
+      'https://res.cloudinary.com/dsw5tkkyr/image/upload/v1764845539/avatar_wcaknk.png';
 
   // Validation error messages
   String? _firstNameError;
@@ -47,14 +53,70 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   // PICK IMAGE AND OPEN CROP UI
   Future<void> pickImage() async {
+    // Show dialog to choose between camera and gallery
+    final ImageSource? source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Choose Image Source',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: themeColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.camera_alt, color: themeColor),
+              ),
+              title: Text(
+                'Camera',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: themeColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.photo_library, color: themeColor),
+              ),
+              title: Text(
+                'Gallery',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     try {
-      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
       if (pickedFile == null) return;
 
       final bytes = await pickedFile.readAsBytes();
+
+      if (!mounted) return;
+
       setState(() {
         _selectedImageBytes = bytes;
-        _isCropping = true; // show cropping screen
+        _isCropping = true;
       });
     } catch (e) {
       debugPrint('Error picking image: $e');
@@ -126,13 +188,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       request.fields['first_name'] = firstName;
       request.fields['last_name'] = lastName;
 
-      // Add profile image if selected (this is the correct way for multer)
-      if (_profileImageBytes != null) {
+      if (_croppedImageFile != null) {
         request.files.add(
-          http.MultipartFile.fromBytes(
+          await http.MultipartFile.fromPath(
             'profile_image',
-            _profileImageBytes!,
-            filename: 'profile.jpg',
+            _croppedImageFile!.path,
+            contentType: MediaType('image', 'jpeg'),
           ),
         );
       }
@@ -157,11 +218,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           final userData = data['data'];
           if (userData != null) {
             final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('user_id', userData['user_id']?.toString() ?? '');
+            await prefs.setString(
+              'user_id',
+              userData['user_id']?.toString() ?? '',
+            );
             await prefs.setString('user_email', userData['user_email'] ?? '');
             await prefs.setString('first_name', userData['first_name'] ?? '');
             await prefs.setString('last_name', userData['last_name'] ?? '');
-            await prefs.setString('profile_image', userData['profile_image'] ?? '');
+            await prefs.setString(
+              'profile_image',
+              userData['profile_image'] ?? '',
+            );
           }
         } catch (_) {}
 
@@ -236,12 +303,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     controller: _cropController,
                     image: _selectedImageBytes!,
                     aspectRatio: 1, // square crop
-                    onCropped: (croppedBytes) {
+                    onCropped: (croppedBytes) async {
+                      final decoded = img.decodeImage(croppedBytes);
+                      if (decoded == null) return;
+
+                      final jpgBytes = img.encodeJpg(decoded, quality: 85);
+
+                      final dir = await getTemporaryDirectory();
+                      final file = File('${dir.path}/profile.jpg');
+                      await file.writeAsBytes(jpgBytes);
+
+                      if (!mounted) return; // 🔥 IMPORTANT
+
                       setState(() {
-                        _profileImageBytes = croppedBytes;
+                        _croppedImageFile = file;
+                        _profileImageBytes = Uint8List.fromList(jpgBytes);
                         _isCropping = false;
                       });
                     },
+
                     baseColor: Colors.black,
                     maskColor: Colors.black26,
                     cornerDotBuilder: (size, edgeAlignment) => Container(
@@ -321,14 +401,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: themeColor, width: 2),
+                                  border: Border.all(
+                                    color: themeColor,
+                                    width: 2,
+                                  ),
                                 ),
                                 child: CircleAvatar(
                                   radius: 48,
                                   backgroundColor: Colors.green.shade100,
                                   backgroundImage: _profileImageBytes != null
                                       ? MemoryImage(_profileImageBytes!)
-                                      : NetworkImage(_defaultAvatarUrl) as ImageProvider,
+                                      : NetworkImage(_defaultAvatarUrl)
+                                            as ImageProvider,
                                 ),
                               ),
                               Positioned(
@@ -339,7 +423,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                   decoration: BoxDecoration(
                                     color: themeColor,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
                                   ),
                                   child: const Icon(
                                     Icons.camera_alt,
@@ -415,15 +502,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         icon: Icons.lock_outline,
                         errorText: _passwordError,
                         enabled: !_isLoading,
-                        suffixIcon: _isLoading ? null : IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
-                          },
-                        ),
+                        suffixIcon: _isLoading
+                            ? null
+                            : IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  );
+                                },
+                              ),
                       ),
                       const SizedBox(height: 20),
 
@@ -435,15 +528,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         icon: Icons.lock_outline,
                         errorText: _confirmPasswordError,
                         enabled: !_isLoading,
-                        suffixIcon: _isLoading ? null : IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () {
-                            setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
-                          },
-                        ),
+                        suffixIcon: _isLoading
+                            ? null
+                            : IconButton(
+                                icon: Icon(
+                                  _obscureConfirmPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(
+                                    () => _obscureConfirmPassword =
+                                        !_obscureConfirmPassword,
+                                  );
+                                },
+                              ),
                       ),
 
                       const SizedBox(height: 35),
@@ -561,7 +661,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: errorText != null ? Colors.red.shade300 : Colors.green.shade200,
+            color: errorText != null
+                ? Colors.red.shade300
+                : Colors.green.shade200,
           ),
         ),
         disabledBorder: OutlineInputBorder(
@@ -583,7 +685,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Colors.red, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 15,
+          horizontal: 18,
+        ),
       ),
     );
   }
