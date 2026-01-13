@@ -319,24 +319,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: Colors.red.shade50,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.shade200),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.warning_amber,
-                          color: Colors.orange[700],
-                          size: 20,
-                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'No sports available. Check console for details.',
+                            'No sports available',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
-                              color: Colors.orange[700],
                             ),
                           ),
                         ),
