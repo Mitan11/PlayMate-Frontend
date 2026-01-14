@@ -1,42 +1,65 @@
-import React, { useContext } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import NavItem from "../components/NavItem";
 import { AppContext } from "../context/AppContextProvider";
 import { assets } from "../assets/assets";
+import Box from "@mui/joy/Box";
+import Tooltip from "@mui/joy/Tooltip";
 
 function Sidebar() {
     const { aToken } = useContext(AppContext);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-    // Sidebar Animation Variants
-    const sidebarVariants = {
-        hidden: { x: -250, opacity: 0 }, // Initially hidden (off-screen)
-        visible: {
-            x: 0,
-            opacity: 1,
-            transition: { duration: 0.5, ease: "easeOut" },
-        }, // Animate in
-    };
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 900);
+        };
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    if (!aToken) return null;
 
     return (
-        <motion.div
-            className="min-h-screen bg-white border-r border-gray-300"
-            variants={sidebarVariants}
-            initial="hidden"
-            animate="visible"
+        <motion.aside
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            style={{
+                width: isMobile ? 64 : 240,
+                minHeight: "calc(100vh - 60px)",
+                background: "linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%)",
+                borderRight: "1px solid rgba(0,0,0,0.06)",
+                display: "flex",
+                flexDirection: "column",
+            }}
         >
-            <ul className="text-[#515151] mt-5">
-                <NavItem
-                    to="/admin-dashboard"
-                    icon={assets.home_icon}
-                    text="Dashboard"
-                />
-                <NavItem
-                    to="/sports-management"
-                    icon={assets.sports_icon}
-                    text="Sports Management"
-                />
-            </ul>
-        </motion.div>
+            <Box sx={{ py: 2 }}>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                    <Tooltip title="Dashboard" placement="right" disableHoverListener={!isMobile}>
+                        <div>
+                            <NavItem
+                                to="/admin-dashboard"
+                                icon={assets.home_icon}
+                                text={isMobile ? "" : "Dashboard"}
+                                centerIcon={isMobile}
+                            />
+                        </div>
+                    </Tooltip>
+
+                    <Tooltip title="Sports Management" placement="right" disableHoverListener={!isMobile}>
+                        <div>
+                            <NavItem
+                                to="/sports-management"
+                                icon={assets.sports_icon}
+                                text={isMobile ? "" : "Sports Management"}
+                                centerIcon={isMobile}
+                            />
+                        </div>
+                    </Tooltip>
+                </ul>
+            </Box>
+        </motion.aside>
     );
 }
 
