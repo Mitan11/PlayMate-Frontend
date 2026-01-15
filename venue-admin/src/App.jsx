@@ -5,22 +5,48 @@ import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import { Navigate, Route, Routes } from "react-router";
 import Dashboard from "./pages/Dashboard";
+import Box from "@mui/joy/Box";
 
 export default function App() {
     const { token } = useContext(AppContext);
 
     return (
         token ? (
-            <div className="bg-[#F8F9FD] h-screen overflow-hidden ">
+            <Box
+                sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    height: "100vh",
+                    width: "100vw",
+                    overflow: "hidden",
+                    backgroundColor: "#F8F9FD",
+                }}
+            >
                 <Navbar />
-                <div className="flex items-start ">
+                <Box
+                    sx={{
+                        display: "flex",
+                        flex: 1,
+                        width: "100%",
+                        overflow: "hidden",
+                    }}
+                >
                     <Sidebar />
-                    <Routes>
-                        <Route path="/" element={<Navigate to="/dashboard" />} />
-                        <Route path="/dashboard" element={<Dashboard />} />
-                    </Routes>
-                </div>
-            </div>
+                    <Box
+                        sx={{
+                            flex: 1,
+                            width: "100%",
+                            overflowY: "auto",
+                            overflowX: "hidden",
+                        }}
+                    >
+                        <Routes>
+                            <Route path="/" element={<Navigate to="/dashboard" />} />
+                            <Route path="/dashboard" element={<Dashboard />} />
+                        </Routes>
+                    </Box>
+                </Box>
+            </Box>
         ) : (
             <>
                 <Login />

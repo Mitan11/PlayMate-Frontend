@@ -8,27 +8,37 @@ import { toast } from "react-hot-toast";
 
 export default function Login() {
     const navigate = useNavigate();
-    const [state, setState] = useState("Login");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const { backendUrl, aToken, setaToken } = useContext(AppContext);
+    const { backendUrl, setaToken } = useContext(AppContext);
 
     const [errors, setErrors] = useState({ email: "", password: "" });
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        document.title = `PlayMate | ${state}`;
-    }, [state]);
+        document.title = "PlayMate | Admin Login";
+    }, []);
+
+    useEffect(() => {
+        const token = localStorage.getItem("aToken");
+        if (token) {
+            navigate("/admin-dashboard", { replace: true });
+        }
+    }, [navigate]);
 
     const validateForm = () => {
         let isValid = true;
         const newErrors = { email: "", password: "" };
 
-        if (email.trim() === "") {
-            isValid = false;
+        if (!email.trim()) {
             newErrors.email = "Email is required";
+            isValid = false;
+        } else if (!/\S+@\S+\.\S+/.test(email)) {
+            newErrors.email = "Enter a valid email";
+            isValid = false;
         }
+
 
         if (password.trim() === "") {
             isValid = false;
@@ -43,18 +53,20 @@ export default function Login() {
     const onSubmitHandler = async (e) => {
         e.preventDefault();
 
+        if (isLoading) return;
+
         if (!validateForm()) return;
 
         setIsLoading(true);
 
         try {
-            const response = await axios.post(`${backendUrl}/admin/admin-login`, { email: email.trim(), password: password.trim() });
+            const response = await axios.post(`${backendUrl}/admin/admin-login`,
+                { email: email.trim().toLowerCase(), password: password.trim() });
             console.log(response);
             const aToken = response.data.token;
 
-            if (response.status !== 200) {
-                toast.error(response.data.message);
-                return;
+            if (!aToken) {
+                throw new Error("Invalid login response");
             }
 
             setaToken(aToken);
@@ -157,6 +169,7 @@ export default function Login() {
                         id="email"
                         type="email"
                         value={email}
+                        aria-label="Email Address"
                         onChange={(e) => {
                             setEmail(e.target.value);
                             if (errors.email) setErrors({ ...errors, email: "" });
@@ -179,6 +192,7 @@ export default function Login() {
                     </label>
                     <div className="relative">
                         <motion.input
+                            aria-label="Password"
                             id="password"
                             type={showPassword ? "text" : "password"}
                             value={password}

@@ -49,7 +49,7 @@ function Navbar() {
                     background: "linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)",
                     borderBottom: "1px solid",
                     borderColor: "rgba(0, 0, 0, 0.08)",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                    boxShadow: "0 1px 1px rgba(0,0,0,0.08)",
                     position: "sticky",
                     top: 0,
                     zIndex: 999,
@@ -82,7 +82,9 @@ function Navbar() {
                                 fontSize: { xs: "1rem", sm: "1.25rem" }
                             }}
                         >
-                            PlayMate
+                            <p className="border px-2.5 py-0.5 text-xs rounded-full border-gray-500 text-gray-600">
+                                Admin
+                            </p>
                         </Typography>
                     </Box>
                 </Box>
