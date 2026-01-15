@@ -10,6 +10,7 @@ import Modal from '../components/Modalbox';
 import FormControl from '@mui/joy/FormControl';
 import FormLabel from '@mui/joy/FormLabel';
 import Input from '@mui/joy/Input';
+import { Button } from '@mui/joy';
 
 function SportsManagement() {
     const { backendUrl, aToken } = useContext(AppContext);
@@ -21,6 +22,8 @@ function SportsManagement() {
     const [openEditModal, setOpenEditModal] = useState(false);
     const [editingSport, setEditingSport] = useState(null);
     const [editFormData, setEditFormData] = useState({ sport_name: '' });
+    const [addModalOpen, setAddModalOpen] = useState(false);
+    const [addFormData, setAddFormData] = useState({ sport_name: '' });
 
     const containerVariants = {
         hidden: { opacity: 0, y: 10 },
@@ -164,6 +167,52 @@ function SportsManagement() {
         setEditFormData({ sport_name: '' });
     }, []);
 
+    const handleAddClick = useCallback(() => {
+        setAddFormData({ sport_name: '' });
+        setAddModalOpen(true);
+    }, []);
+
+    const handleAddFormChange = useCallback((field, value) => {
+        setAddFormData(prev => ({ ...prev, [field]: value }));
+    }, []);
+
+    const handleAddSubmit = useCallback(async () => {
+        if (!addFormData.sport_name.trim()) {
+            toast.error('Sport name is required');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const response = await axios.post(`${backendUrl}/admin/addSport`, {
+                sport_name: addFormData.sport_name.trim()
+            }, {
+                headers: {
+                    Authorization: `Bearer ${aToken}`,
+                },
+            });
+
+            if (response.data?.status) {
+                toast.success('Sport added successfully');
+                fetchSports();
+                setAddModalOpen(false);
+                setAddFormData({ sport_name: '' });
+            } else {
+                throw new Error('Failed to add sport');
+            }
+        } catch (err) {
+            const message = err.response?.data?.message || 'Failed to add sport';
+            toast.error(message);
+        } finally {
+            setLoading(false);
+        }
+    }, [backendUrl, aToken, addFormData, fetchSports]);
+
+    const handleCancelAdd = useCallback(() => {
+        setAddModalOpen(false);
+        setAddFormData({ sport_name: '' });
+    }, []);
+
     const actions = useMemo(() => [
         {
             label: 'Edit',
@@ -197,6 +246,7 @@ function SportsManagement() {
                     cancelText="Cancel"
                     width={400}
                     minWidth={250}
+                    color='danger'
                 >
                     <Typography id="modal-desc" textColor="text.tertiary" sx={{ mb: 3 }}>
                         Are you sure you want to delete this sport?
@@ -214,6 +264,7 @@ function SportsManagement() {
                     cancelText="Cancel"
                     width={600}
                     minWidth={400}
+                    color='warning'
                 >
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 300, marginBottom: 3 }}>
                         <FormControl>
@@ -227,13 +278,49 @@ function SportsManagement() {
                         </FormControl>
                     </Box>
                 </Modal>
+                {/* Add Sport Modal */}
+                <Modal
+                    open={addModalOpen}
+                    setOpen={setAddModalOpen}
+                    title="Add New Sport"
+                    onConfirm={handleAddSubmit}
+                    onCancel={handleCancelAdd}
+                    confirmText="Add"
+                    cancelText="Cancel"
+                    width={600}
+                    minWidth={400}
+                >
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 300, marginBottom: 3 }}>
+                        <FormControl>
+                            <FormLabel>Sport Name</FormLabel>
+                            <Input
+                                placeholder="Enter sport name"
+                                value={addFormData.sport_name}
+                                onChange={(e) => handleAddFormChange('sport_name', e.target.value)}
+                                required
+                                autoFocus
+                            />
+                        </FormControl>
+                    </Box>
+                </Modal>
                 <Box sx={{ mb: 3 }}>
-                    <Typography level="h2" sx={{ fontSize: { xs: "1.5rem", sm: "1.875rem", md: "2.25rem" } }}>
-                        Sports Management
-                    </Typography>
-                    <Typography level="body-sm" sx={{ color: "neutral.500" }}>
-                        Manage the sports available in your Application
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                        <Box>
+                            <Typography level="h2" sx={{ fontSize: { xs: "1.5rem", sm: "1.875rem", md: "2.25rem" } }}>
+                                Sports Management
+                            </Typography>
+                            <Typography level="body-sm" sx={{ color: "neutral.500" }}>
+                                Manage the sports available in your Application
+                            </Typography>
+                        </Box>
+                        <Button
+                            variant="solid"
+                            color="primary"
+                            onClick={handleAddClick}
+                        >
+                            Add Sport
+                        </Button>
+                    </Box>
                 </Box>
 
                 {error && (

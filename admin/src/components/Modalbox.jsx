@@ -4,19 +4,21 @@ import Typography from '@mui/joy/Typography';
 import Sheet from '@mui/joy/Sheet';
 import Button from '@mui/joy/Button';
 import Box from '@mui/joy/Box';
+import { color } from 'framer-motion';
 
-export default function Modalbox({ 
-    open, 
-    setOpen, 
-    title, 
-    children, 
-    onConfirm, 
-    onCancel, 
-    confirmText = "Confirm", 
-    cancelText = "Cancel", 
+export default function Modalbox({
+    open,
+    setOpen,
+    title,
+    children,
+    onConfirm,
+    onCancel,
+    confirmText = "Confirm",
+    cancelText = "Cancel",
     showActions = true,
     width = 500,
-    minWidth = 300
+    minWidth = 300,
+    color = "primary"
 }) {
     const handleConfirm = () => {
         if (onConfirm) onConfirm();
@@ -38,13 +40,13 @@ export default function Modalbox({
         >
             <Sheet
                 variant="outlined"
-                sx={{ 
-                    maxWidth: width, 
+                sx={{
+                    maxWidth: width,
                     minWidth: minWidth,
                     width: '90vw',
-                    borderRadius: 'md', 
-                    p: 3, 
-                    boxShadow: 'lg' 
+                    borderRadius: 'md',
+                    p: 3,
+                    boxShadow: 'lg'
                 }}
             >
                 <ModalClose variant="plain" sx={{ m: 1 }} />
@@ -63,7 +65,7 @@ export default function Modalbox({
                         <Button variant="plain" color="neutral" onClick={handleCancel}>
                             {cancelText}
                         </Button>
-                        <Button variant="solid" color="danger" onClick={handleConfirm}>
+                        <Button variant="soft" color={color} onClick={handleConfirm}>
                             {confirmText}
                         </Button>
                     </Box>

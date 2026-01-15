@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/joy/Box';
 import Button from '@mui/joy/Button';
 import Table from '@mui/joy/Table';
 import Sheet from '@mui/joy/Sheet';
 import Skeleton from '@mui/joy/Skeleton';
+import Typography from '@mui/joy/Typography';
+import Input from '@mui/joy/Input';
 
 function DataTable({
     columns,
@@ -13,10 +15,85 @@ function DataTable({
     skeletonRows = 5,
     firstColumnWidth = 80,
     lastColumnWidth = 144,
+    searchable = true,
+    searchPlaceholder = "Search...",
+    pageSize = 7,
 }) {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortConfig, setSortConfig] = useState();
+    const [page, setPage] = useState(1);
+
+    // Filter rows based on search query
+    const filteredRows = useMemo(() => {
+        if (!searchQuery) return rows;
+
+        return rows.filter((row) =>
+            columns.some((col) =>
+                String(row[col.key] ?? '')
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase())
+            )
+        );
+    }, [rows, searchQuery, columns]);
+
+    // Sort filtered rows
+    const sortedRows = useMemo(() => {
+        if (!sortConfig) return filteredRows;
+
+        const { key, direction } = sortConfig;
+
+        return [...filteredRows].sort((a, b) => {
+            const aVal = a[key];
+            const bVal = b[key];
+
+            if (aVal == null) return 1;
+            if (bVal == null) return -1;
+
+            if (typeof aVal === 'number' && typeof bVal === 'number') {
+                return direction === 'asc' ? aVal - bVal : bVal - aVal;
+            }
+
+            return direction === 'asc'
+                ? String(aVal).localeCompare(String(bVal))
+                : String(bVal).localeCompare(String(aVal));
+        });
+
+    }, [filteredRows, sortConfig]);
+
+    // Paginate sorted rows
+    const paginatedRows = useMemo(() => {
+        const start = (page - 1) * pageSize;
+        return sortedRows.slice(start, start + pageSize);
+    }, [sortedRows, page, pageSize]);
+
+    // Calculate total pages
+    const totalPages = Math.ceil(sortedRows.length / pageSize);
+
+    // Reset page when search changes
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, sortConfig]);
+
+    useEffect(() => {
+        const t = setTimeout(() => setPage(1), 300);
+        return () => clearTimeout(t);
+    }, [searchQuery]);
+
 
     return (
         <Box sx={{ width: '100%' }}>
+            {/* Search Input */}
+            {searchable && (
+                <Box sx={{ mb: 2 }}>
+                    <Input
+                        placeholder={searchPlaceholder}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        sx={{ width: '100%' }}
+                    />
+                </Box>
+            )}
+
             <Sheet
                 variant="outlined"
                 sx={(theme) => ({
@@ -51,8 +128,26 @@ function DataTable({
                     <thead>
                         <tr>
                             {columns.map((col) => (
-                                <th key={col.key} style={{ width: col.width }}>
+                                <th
+                                    key={col.key}
+                                    style={{
+                                        width: col.width,
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}
+                                    onClick={() => {
+                                        setSortConfig((prev) => ({
+                                            key: col.key,
+                                            direction:
+                                                prev?.key === col.key && prev.direction === 'asc'
+                                                    ? 'desc'
+                                                    : 'asc',
+                                        }))
+                                    }}
+                                >
                                     {col.label}
+                                    {sortConfig?.key === col.key &&
+                                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                                 </th>
                             ))}
                             {actions.length > 0 && (
@@ -92,7 +187,7 @@ function DataTable({
                                     )}
                                 </tr>
                             ))
-                        ) : rows.length === 0 ? (
+                        ) : paginatedRows.length === 0 ? (
                             <tr>
                                 <td colSpan={columns.length + (actions.length > 0 ? 1 : 0)}>
                                     <Box
@@ -102,12 +197,12 @@ function DataTable({
                                             color: 'neutral.500',
                                         }}
                                     >
-                                        No sports found
+                                        {searchQuery ? 'No results found' : 'No sports found'}
                                     </Box>
                                 </td>
                             </tr>
                         ) : (
-                            rows.map((row, index) => (
+                            paginatedRows.map((row, index) => (
                                 <tr key={row.id ?? index}>
                                     {columns.map((col) => (
                                         <td key={col.key}>
@@ -140,6 +235,36 @@ function DataTable({
                     </tbody>
                 </Table>
             </Sheet>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                    <Typography level="body-sm" sx={{ color: 'neutral.500' }}>
+                        Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, sortedRows.length)} of {sortedRows.length} entries
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                            size="sm"
+                            variant="outlined"
+                            disabled={page === 1}
+                            onClick={() => setPage((p) => p - 1)}
+                        >
+                            Prev
+                        </Button>
+                        <Typography level="body-sm" sx={{ px: 2, py: 1, alignSelf: 'center' }}>
+                            Page {page} of {totalPages}
+                        </Typography>
+                        <Button
+                            size="sm"
+                            variant="outlined"
+                            disabled={page >= totalPages}
+                            onClick={() => setPage((p) => p + 1)}
+                        >
+                            Next
+                        </Button>
+                    </Box>
+                </Box>
+            )}
         </Box>
     );
 }
