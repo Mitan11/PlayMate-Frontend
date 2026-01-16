@@ -317,13 +317,23 @@ function SportsManagement() {
                                 Manage the sports available in your Application
                             </Typography>
                         </Box>
-                        <Button
-                            variant="solid"
-                            color="primary"
-                            onClick={handleAddClick}
-                        >
-                            Add Sport
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                                variant="solid"
+                                color="primary"
+                                onClick={handleAddClick}
+                            >
+                                Add Sport
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                color="neutral"
+                                loading={loading}
+                                onClick={fetchSports}
+                            >
+                                Refresh
+                            </Button>
+                        </Box>
                     </Box>
                 </Box>
 

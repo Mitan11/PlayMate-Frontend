@@ -57,6 +57,17 @@ function Sidebar() {
                             />
                         </div>
                     </Tooltip>
+
+                    <Tooltip title="Users Management" placement="right" disableHoverListener={!isMobile}>
+                        <div>
+                            <NavItem
+                                to="/users-management"
+                                icon={assets.users_icon}
+                                text={isMobile ? "" : "Users Management"}
+                                centerIcon={isMobile}
+                            />
+                        </div>
+                    </Tooltip>
                 </ul>
             </Box>
         </motion.aside>

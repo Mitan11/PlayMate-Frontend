@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import SportsManagement from "./pages/SportsManagement";
 import Box from "@mui/joy/Box";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import UsersManagement from "./pages/UsersManagement";
 
 export default function App() {
     const { aToken } = useContext(AppContext);
@@ -47,6 +48,7 @@ export default function App() {
                             <Route path="/admin-dashboard" element={<Dashboard />} />
                             <Route path="/sports-management" element={<SportsManagement />} />
                             <Route path="/admin/analytics" element={<AdminAnalytics />} />
+                            <Route path="/users-management" element={<UsersManagement />} />
                         </Routes>
                     </Box>
                 </Box>
