@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:io';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class AddCaptionScreen extends StatefulWidget {
   final File imageFile;
 
@@ -25,26 +27,48 @@ class _AddCaptionScreenState extends State<AddCaptionScreen> {
   Future<void> _sharePost() async {
     setState(() => _isPosting = true);
 
-    // Simulate posting delay
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId != null) {
+        // Get existing posts
+        final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
 
-    if (mounted) {
-      setState(() => _isPosting = false);
+        // Add new image path
+        currentPosts.insert(0, widget.imageFile.path);
 
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Post shared successfully! 🎉',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+        // Save updated list
+        await prefs.setStringList('user_posts_$userId', currentPosts);
+      }
+
+      await Future.delayed(const Duration(seconds: 1)); // Simulate network
+
+      if (mounted) {
+        setState(() => _isPosting = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Post shared successfully! 🎉',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+            ),
+            backgroundColor: themeColor,
           ),
-          backgroundColor: themeColor,
-        ),
-      );
+        );
 
-      // Navigate back to home (pop twice to go back to home screen)
-      Navigator.pop(context);
-      Navigator.pop(context, true);
+        Navigator.pop(context);
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      setState(() => _isPosting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing post: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
