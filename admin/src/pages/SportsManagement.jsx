@@ -65,6 +65,7 @@ function SportsManagement() {
 
     // Define columns
     const columns = useMemo(() => [
+        { key: 'no', label: 'NO', width: 50 },
         { key: 'sport_id', label: 'ID', width: 80 },
         { key: 'sport_name', label: 'Sport Name', width: 200 },
         { key: 'created_at', label: 'Created Date', width: 200 },
@@ -72,11 +73,14 @@ function SportsManagement() {
 
     // Transform sports data for table
     const rows = useMemo(
-        () =>
-            sports.map((sport) => ({
+        () => {
+            let no = 1;
+            return sports.map((sport) => ({
+                no: no++,
                 ...sport,
                 created_at: new Date(sport.created_at).toLocaleDateString(),
-            })),
+            }));
+        },
         [sports]
     );
 

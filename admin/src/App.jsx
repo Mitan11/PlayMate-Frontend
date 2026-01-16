@@ -7,6 +7,7 @@ import { Navigate, Route, Routes } from "react-router";
 import Dashboard from "./pages/Dashboard";
 import SportsManagement from "./pages/SportsManagement";
 import Box from "@mui/joy/Box";
+import AdminAnalytics from "./pages/AdminAnalytics";
 
 export default function App() {
     const { aToken } = useContext(AppContext);
@@ -45,6 +46,7 @@ export default function App() {
                             <Route path="/" element={<Navigate to="/admin-dashboard" />} />
                             <Route path="/admin-dashboard" element={<Dashboard />} />
                             <Route path="/sports-management" element={<SportsManagement />} />
+                            <Route path="/admin/analytics" element={<AdminAnalytics />} />
                         </Routes>
                     </Box>
                 </Box>

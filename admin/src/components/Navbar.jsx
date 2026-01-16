@@ -66,8 +66,8 @@ function Navbar() {
                     <motion.img
                         whileHover={{ scale: 1.05 }}
                         className="cursor-pointer"
-                        style={{ width: "auto", height: "35px", transition: "all 0.2s" }}
-                        src={assets.admin_logo}
+                        style={{ width: "auto", height: "55px", transition: "all 0.2s" }}
+                        src={assets.icon}
                         alt="Admin Logo"
                     />
                     <Box sx={{ display: { xs: "none", sm: "block" } }}>
