@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,8 +35,15 @@ class _AddCaptionScreenState extends State<AddCaptionScreen> {
         // Get existing posts
         final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
 
-        // Add new image path
-        currentPosts.insert(0, widget.imageFile.path);
+        // Create post data object
+        final postData = {
+          'path': widget.imageFile.path,
+          'caption': _captionController.text,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+
+        // Add new post as JSON string
+        currentPosts.insert(0, jsonEncode(postData));
 
         // Save updated list
         await prefs.setStringList('user_posts_$userId', currentPosts);

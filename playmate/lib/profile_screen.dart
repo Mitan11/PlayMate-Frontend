@@ -663,9 +663,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const SettingsScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => SettingsScreen()),
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -742,7 +740,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildPostsSection() {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(5),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,15 +750,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(48),
               decoration: BoxDecoration(
-                color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
               child: Column(
                 children: [
@@ -829,61 +819,88 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             )
           else ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${_userPosts.length} Post${_userPosts.length != 1 ? 's' : ''}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [themeColor, themeColor.withOpacity(0.8)],
+            // Post Count and Add Button (Unchanged logic, just keeping context)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${_userPosts.length} Post${_userPosts.length != 1 ? 's' : ''}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
                     ),
-                    shape: BoxShape.circle,
                   ),
-                  child: IconButton(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const CreatePostScreen(),
-                        ),
-                      );
-                      if (result == true && mounted) {
-                        _loadUserPosts();
-                      }
-                    },
-                    icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [themeColor, themeColor.withOpacity(0.8)],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CreatePostScreen(),
+                          ),
+                        );
+                        if (result == true && mounted) {
+                          _loadUserPosts();
+                        }
+                      },
+                      icon: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
+            // Instagram-style Grid
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
+                crossAxisSpacing: 1,
+                mainAxisSpacing: 1,
                 childAspectRatio: 1,
               ),
               itemCount: _userPosts.length,
               itemBuilder: (context, index) {
+                // Parse post data (handle plain path vs JSON)
+                String imagePath = _userPosts[index];
+                String? caption;
+
+                try {
+                  if (imagePath.trim().startsWith('{')) {
+                    final Map<String, dynamic> data = jsonDecode(imagePath);
+                    imagePath = data['path'] ?? '';
+                    caption = data['caption'];
+                  }
+                } catch (e) {
+                  // Fallback to treat as simple path
+                }
+
+                if (imagePath.isEmpty) return const SizedBox();
+
                 return GestureDetector(
                   onTap: () async {
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => PostDetailScreen(
-                          imageFile: File(_userPosts[index]),
+                          imageFile: File(imagePath),
                           postIndex: index,
+                          caption: caption,
                         ),
                       ),
                     );
@@ -892,42 +909,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                     }
                   },
                   child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Stack(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              image: DecorationImage(
-                                image: FileImage(File(_userPosts[index])),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.1),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    color: Colors.grey[200],
+                    child: Image.file(
+                      File(imagePath),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(Icons.broken_image, color: Colors.grey),
+                        );
+                      },
                     ),
                   ),
                 );
@@ -941,139 +931,89 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildSportsSection() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'My Sports',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_userSports.length} sport${_userSports.length != 1 ? 's' : ''} added',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [themeColor, themeColor.withOpacity(0.8)],
-                  ),
-                  shape: BoxShape.circle,
+              Text(
+                'My Sports',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
                 ),
-                child: IconButton(
-                  onPressed: _showAddSportDialog,
-                  icon: const Icon(Icons.add, color: Colors.white),
-                  iconSize: 20,
+              ),
+              TextButton.icon(
+                onPressed: _showAddSportDialog,
+                icon: Icon(
+                  Icons.add_circle_outline,
+                  size: 18,
+                  color: themeColor,
+                ),
+                label: Text(
+                  'Add New',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: themeColor,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          if (_userSports.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(48),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
+        ),
+
+        if (_userSports.isEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.sports_basketball_outlined,
+                  size: 50,
+                  color: Colors.grey.shade300,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No Sports Added Yet',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
                   ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          themeColor.withOpacity(0.1),
-                          themeColor.withOpacity(0.05),
-                        ],
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.sports_outlined,
-                      size: 40,
-                      color: themeColor,
-                    ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add sports to find partners nearby',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'No Sports Yet',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Add your favorite sports and skill levels\nto connect with like-minded players',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: _showAddSportDialog,
-                    icon: const Icon(Icons.add_rounded),
-                    label: Text(
-                      'Add Your First Sport',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: themeColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 28,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.95,
-              ),
+                ),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 100, // Reduced height for compact look
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
               itemCount: _userSports.length,
               itemBuilder: (context, index) {
                 final userSport = _userSports[index];
@@ -1082,69 +1022,70 @@ class _ProfileScreenState extends State<ProfileScreen>
                 final skillColor = _getSkillLevelColor(skillLevel);
 
                 return Container(
+                  width: 280, // Wider card for horizontal details
+                  margin: const EdgeInsets.only(right: 16, bottom: 4, top: 4),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade200),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        blurRadius: 15,
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  child: Stack(
+                  child: Row(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
+                      // Sport Icon
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: themeColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _sportIcons[sportName] ?? Icons.sports,
+                          color: themeColor,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+
+                      // Details
+                      Expanded(
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    themeColor.withOpacity(0.1),
-                                    themeColor.withOpacity(0.05),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                _sportIcons[sportName] ?? Icons.sports,
-                                color: themeColor,
-                                size: 24,
-                              ),
-                            ),
-                            const Spacer(),
                             Text(
                               sportName,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: Colors.black87,
-                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
+                                horizontal: 8,
+                                vertical: 2,
                               ),
                               decoration: BoxDecoration(
                                 color: skillColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 skillLevel,
                                 style: GoogleFonts.poppins(
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                   color: skillColor,
                                 ),
                               ),
@@ -1152,31 +1093,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ],
                         ),
                       ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: GestureDetector(
-                          onTap: () {
-                            _deleteSport(userSport['user_sport_id']);
-                          },
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.close_rounded,
-                              color: Colors.red[400],
-                              size: 14,
-                            ),
+
+                      // Delete Button
+                      InkWell(
+                        onTap: () => _deleteSport(userSport['user_sport_id']),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 20,
+                            color: Colors.red[400],
                           ),
                         ),
                       ),
@@ -1185,9 +1116,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 );
               },
             ),
-          const SizedBox(height: 40),
-        ],
-      ),
+          ),
+        const SizedBox(height: 30),
+      ],
     );
   }
 
