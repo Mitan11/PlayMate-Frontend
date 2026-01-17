@@ -15,23 +15,24 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final Color themeColor = const Color(0xFF2E7D32);
-  
+
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
-  
+
   // Replace single OTP controller with 4 individual controllers
   final TextEditingController _otp1Controller = TextEditingController();
   final TextEditingController _otp2Controller = TextEditingController();
   final TextEditingController _otp3Controller = TextEditingController();
   final TextEditingController _otp4Controller = TextEditingController();
-  
+
   final FocusNode _otp1Focus = FocusNode();
   final FocusNode _otp2Focus = FocusNode();
   final FocusNode _otp3Focus = FocusNode();
   final FocusNode _otp4Focus = FocusNode();
-  
+
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   // Steps: 0 = Email, 1 = OTP, 2 = New Password
   int _currentStep = 0;
@@ -46,7 +47,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   String _userEmail = '';
   String? _receivedOtp;
-  
+
   // Timer variables
   Timer? _otpTimer;
   int _remainingSeconds = 300; // 5 minutes = 300 seconds
@@ -56,7 +57,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     _remainingSeconds = 300; // Reset to 5 minutes
     _isOtpExpired = false;
     _otpTimer?.cancel(); // Cancel any existing timer
-    
+
     _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
         setState(() {
@@ -103,11 +104,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final resp = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_email': email}),
-      ).timeout(const Duration(seconds: 20));
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'user_email': email}),
+          )
+          .timeout(const Duration(seconds: 20));
 
       debugPrint('Reset email response: ${resp.statusCode} - ${resp.body}');
 
@@ -126,16 +129,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           _receivedOtp = otpFromResponse;
           _currentStep = 1;
         });
-        
+
         // Start the 5-minute timer
         _startOtpTimer();
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(otpFromResponse != null 
-                ? 'OTP sent: $otpFromResponse (Valid for 5 minutes)'
-                : 'OTP sent to your email (Valid for 5 minutes)'),
+              content: Text(
+                otpFromResponse != null
+                    ? 'OTP sent: $otpFromResponse (Valid for 5 minutes)'
+                    : 'OTP sent to your email (Valid for 5 minutes)',
+              ),
               duration: const Duration(seconds: 5),
             ),
           );
@@ -145,18 +150,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         try {
           final data = jsonDecode(resp.body);
           err = (data['message'] ?? err).toString();
+          
+          // Handle validation errors
+          if (data['errors'] != null && data['errors'] is Map) {
+            final errors = data['errors'] as Map<String, dynamic>;
+            setState(() {
+              _emailError = errors['email_error']?.toString();
+            });
+            return; // Don't show general error if we have field-specific errors
+          }
         } catch (_) {}
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(err)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(err)));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Network error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Network error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -177,10 +191,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _otpError = null);
 
     // Combine all 4 digits
-    final otp = _otp1Controller.text + 
-                _otp2Controller.text + 
-                _otp3Controller.text + 
-                _otp4Controller.text;
+    final otp =
+        _otp1Controller.text +
+        _otp2Controller.text +
+        _otp3Controller.text +
+        _otp4Controller.text;
 
     if (otp.isEmpty || otp.length < 4) {
       setState(() => _otpError = 'Please enter complete OTP');
@@ -242,14 +257,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final resp = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user_email': _userEmail,
-          'new_password': newPass,
-        }),
-      ).timeout(const Duration(seconds: 20));
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'user_email': _userEmail,
+              'new_password': newPass,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
 
       debugPrint('Reset password response: ${resp.statusCode} - ${resp.body}');
 
@@ -269,18 +286,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         try {
           final data = jsonDecode(resp.body);
           err = (data['message'] ?? err).toString();
+          
+          // Handle validation errors
+          if (data['errors'] != null && data['errors'] is Map) {
+            final errors = data['errors'] as Map<String, dynamic>;
+            setState(() {
+              _passwordError = errors['password_error']?.toString() ?? errors['new_password_error']?.toString();
+              _confirmPasswordError = errors['confirm_password_error']?.toString();
+            });
+            return; // Don't show general error if we have field-specific errors
+          }
         } catch (_) {}
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(err)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(err)));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Network error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Network error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -320,10 +347,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 10),
         Text(
           "Enter your email to receive a password reset OTP",
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            color: Colors.grey[700],
-          ),
+          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
         ),
         const SizedBox(height: 30),
         Text(
@@ -345,11 +369,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             errorText: _emailError,
             errorStyle: const TextStyle(fontSize: 12),
             filled: true,
-            fillColor: !_isLoading ? Colors.green.shade50 : Colors.grey.shade200,
+            fillColor: !_isLoading
+                ? Colors.green.shade50
+                : Colors.grey.shade200,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: _emailError != null ? Colors.red.shade300 : themeColor.withOpacity(.4),
+                color: _emailError != null
+                    ? Colors.red.shade300
+                    : themeColor.withOpacity(.4),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -409,10 +437,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       width: 60,
       height: 60,
       decoration: BoxDecoration(
-        color: (!_isLoading && !_isOtpExpired) ? Colors.green.shade50 : Colors.grey.shade200,
+        color: (!_isLoading && !_isOtpExpired)
+            ? Colors.green.shade50
+            : Colors.grey.shade200,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _otpError != null ? Colors.red.shade300 : themeColor.withOpacity(.4),
+          color: _otpError != null
+              ? Colors.red.shade300
+              : themeColor.withOpacity(.4),
           width: 1.5,
         ),
       ),
@@ -464,12 +496,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 10),
         Text(
           "We've sent a 4-digit OTP to $_userEmail",
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            color: Colors.grey[700],
-          ),
+          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
         ),
-        
+
         // Timer Display
         const SizedBox(height: 15),
         Container(
@@ -491,12 +520,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                _isOtpExpired 
-                  ? 'OTP Expired'
-                  : 'OTP expires in ${_formatTime(_remainingSeconds)}',
+                _isOtpExpired
+                    ? 'OTP Expired'
+                    : 'OTP expires in ${_formatTime(_remainingSeconds)}',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
-                  color: _isOtpExpired ? Colors.red.shade700 : Colors.blue.shade700,
+                  color: _isOtpExpired
+                      ? Colors.red.shade700
+                      : Colors.blue.shade700,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -531,9 +562,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
         ],
-        
+
         const SizedBox(height: 30),
-        
+
         // 4 OTP Input Boxes
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -544,45 +575,47 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             _buildOtpBox(_otp4Controller, _otp4Focus, null),
           ],
         ),
-        
+
         if (_otpError != null) ...[
           const SizedBox(height: 8),
           Center(
             child: Text(
               _otpError!,
-              style: const TextStyle(
-                color: Colors.red,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: Colors.red, fontSize: 12),
             ),
           ),
         ],
-        
+
         const SizedBox(height: 30),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             TextButton.icon(
-              onPressed: (_isLoading || (!_isOtpExpired && _remainingSeconds > 240)) ? null : () {
-                _otpTimer?.cancel();
-                setState(() {
-                  _currentStep = 0;
-                  _otp1Controller.clear();
-                  _otp2Controller.clear();
-                  _otp3Controller.clear();
-                  _otp4Controller.clear();
-                  _receivedOtp = null;
-                  _isOtpExpired = false;
-                  _otpError = null;
-                });
-              },
+              onPressed:
+                  (_isLoading || (!_isOtpExpired && _remainingSeconds > 240))
+                  ? null
+                  : () {
+                      _otpTimer?.cancel();
+                      setState(() {
+                        _currentStep = 0;
+                        _otp1Controller.clear();
+                        _otp2Controller.clear();
+                        _otp3Controller.clear();
+                        _otp4Controller.clear();
+                        _receivedOtp = null;
+                        _isOtpExpired = false;
+                        _otpError = null;
+                      });
+                    },
               icon: const Icon(Icons.refresh),
               label: Text(
                 _isOtpExpired ? 'Request New OTP' : 'Resend OTP',
                 style: GoogleFonts.poppins(
-                  color: (_isLoading || (!_isOtpExpired && _remainingSeconds > 240)) 
-                    ? Colors.grey 
-                    : themeColor,
+                  color:
+                      (_isLoading ||
+                          (!_isOtpExpired && _remainingSeconds > 240))
+                      ? Colors.grey
+                      : themeColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -593,10 +626,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           Center(
             child: Text(
               'Available after ${_formatTime(_remainingSeconds - 240)}',
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                color: Colors.grey[600],
-              ),
+              style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[600]),
             ),
           ),
         const SizedBox(height: 10),
@@ -649,10 +679,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 10),
         Text(
           "Enter your new password",
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            color: Colors.grey[700],
-          ),
+          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
         ),
         const SizedBox(height: 30),
         Text(
@@ -670,24 +697,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           enabled: !_isLoading,
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.lock_outline, color: themeColor),
-            suffixIcon: _isLoading ? null : IconButton(
-              icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                color: Colors.grey,
-              ),
-              onPressed: () {
-                setState(() => _obscurePassword = !_obscurePassword);
-              },
-            ),
+            suffixIcon: _isLoading
+                ? null
+                : IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: Colors.grey,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                  ),
             hintText: "Enter new password",
             errorText: _passwordError,
             errorStyle: const TextStyle(fontSize: 12),
             filled: true,
-            fillColor: !_isLoading ? Colors.green.shade50 : Colors.grey.shade200,
+            fillColor: !_isLoading
+                ? Colors.green.shade50
+                : Colors.grey.shade200,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: _passwordError != null ? Colors.red.shade300 : themeColor.withOpacity(.4),
+                color: _passwordError != null
+                    ? Colors.red.shade300
+                    : themeColor.withOpacity(.4),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -715,24 +750,35 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           enabled: !_isLoading,
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.lock_outline, color: themeColor),
-            suffixIcon: _isLoading ? null : IconButton(
-              icon: Icon(
-                _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                color: Colors.grey,
-              ),
-              onPressed: () {
-                setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
-              },
-            ),
+            suffixIcon: _isLoading
+                ? null
+                : IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: Colors.grey,
+                    ),
+                    onPressed: () {
+                      setState(
+                        () =>
+                            _obscureConfirmPassword = !_obscureConfirmPassword,
+                      );
+                    },
+                  ),
             hintText: "Confirm password",
             errorText: _confirmPasswordError,
             errorStyle: const TextStyle(fontSize: 12),
             filled: true,
-            fillColor: !_isLoading ? Colors.green.shade50 : Colors.grey.shade200,
+            fillColor: !_isLoading
+                ? Colors.green.shade50
+                : Colors.grey.shade200,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: _confirmPasswordError != null ? Colors.red.shade300 : themeColor.withOpacity(.4),
+                color: _confirmPasswordError != null
+                    ? Colors.red.shade300
+                    : themeColor.withOpacity(.4),
               ),
             ),
             focusedBorder: OutlineInputBorder(

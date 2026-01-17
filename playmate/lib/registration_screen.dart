@@ -251,6 +251,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         try {
           final data = jsonDecode(resp.body);
           err = (data['message'] ?? data['error'] ?? err).toString();
+          
+          // Handle validation errors
+          if (data['errors'] != null && data['errors'] is Map) {
+            final errors = data['errors'] as Map<String, dynamic>;
+            setState(() {
+              _firstNameError = errors['first_name_error']?.toString();
+              _lastNameError = errors['last_name_error']?.toString();
+              _emailError = errors['email_error']?.toString();
+              _passwordError = errors['password_error']?.toString();
+              _confirmPasswordError = errors['confirm_password_error']?.toString();
+            });
+            return; // Don't show general error if we have field-specific errors
+          }
         } catch (_) {}
         if (mounted) {
           ScaffoldMessenger.of(
@@ -655,7 +668,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
         errorText: errorText,
-        errorStyle: const TextStyle(fontSize: 12),
+        errorMaxLines: 3,
+        errorStyle: TextStyle(
+          fontSize: 12,
+          height: 1.3,
+        ),
         filled: true,
         fillColor: enabled ? Colors.white : Colors.grey.shade200,
         enabledBorder: OutlineInputBorder(

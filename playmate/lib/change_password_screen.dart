@@ -14,10 +14,12 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final Color themeColor = const Color(0xFF2E7D32);
-  
-  final TextEditingController _currentPasswordController = TextEditingController();
+
+  final TextEditingController _currentPasswordController =
+      TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _isCurrentPasswordVisible = false;
   bool _isNewPasswordVisible = false;
@@ -50,7 +52,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       setState(() => _newPasswordError = 'New password is required');
       hasError = true;
     } else if (newPassword.length < 6) {
-      setState(() => _newPasswordError = 'Password must be at least 6 characters');
+      setState(
+        () => _newPasswordError = 'Password must be at least 6 characters',
+      );
       hasError = true;
     }
 
@@ -67,7 +71,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final base = dotenv.env['BASE_URL'] ?? '';
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    
+
     final uri = Uri.parse('$base/auth/change-password');
 
     setState(() => _isChangingPassword = true);
@@ -98,26 +102,45 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           Navigator.pop(context);
         }
       } else {
-        final errorData = jsonDecode(resp.body);
-        final errorMessage = errorData['message'] ?? 'Failed to change password';
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red,
-            ),
-          );
+        try {
+          final errorData = jsonDecode(resp.body);
+          final errorMessage = errorData['message'] ?? 'Failed to change password';
+          
+          // Handle validation errors
+          if (errorData['errors'] != null && errorData['errors'] is Map) {
+            final errors = errorData['errors'] as Map<String, dynamic>;
+            setState(() {
+              _currentPasswordError = errors['current_password_error']?.toString();
+              _newPasswordError = errors['new_password_error']?.toString() ?? errors['password_error']?.toString();
+              _confirmPasswordError = errors['confirm_password_error']?.toString();
+            });
+            return; // Don't show general error if we have field-specific errors
+          }
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to change password'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
       debugPrint('Error changing password: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -164,7 +187,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: errorText != null ? Colors.red.shade300 : Colors.green.shade200,
+                color: errorText != null
+                    ? Colors.red.shade300
+                    : Colors.green.shade200,
               ),
             ),
             disabledBorder: OutlineInputBorder(
@@ -220,7 +245,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-              
+
               // Info Card
               Container(
                 padding: const EdgeInsets.all(16),
@@ -245,48 +270,56 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               _buildPasswordField(
                 label: 'Current Password',
                 controller: _currentPasswordController,
                 isVisible: _isCurrentPasswordVisible,
                 onToggleVisibility: () {
-                  setState(() => _isCurrentPasswordVisible = !_isCurrentPasswordVisible);
+                  setState(
+                    () =>
+                        _isCurrentPasswordVisible = !_isCurrentPasswordVisible,
+                  );
                 },
                 errorText: _currentPasswordError,
                 enabled: !_isChangingPassword,
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               _buildPasswordField(
                 label: 'New Password',
                 controller: _newPasswordController,
                 isVisible: _isNewPasswordVisible,
                 onToggleVisibility: () {
-                  setState(() => _isNewPasswordVisible = !_isNewPasswordVisible);
+                  setState(
+                    () => _isNewPasswordVisible = !_isNewPasswordVisible,
+                  );
                 },
                 errorText: _newPasswordError,
                 enabled: !_isChangingPassword,
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               _buildPasswordField(
                 label: 'Confirm New Password',
                 controller: _confirmPasswordController,
                 isVisible: _isConfirmPasswordVisible,
                 onToggleVisibility: () {
-                  setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible);
+                  setState(
+                    () =>
+                        _isConfirmPasswordVisible = !_isConfirmPasswordVisible,
+                  );
                 },
                 errorText: _confirmPasswordError,
                 enabled: !_isChangingPassword,
               ),
-              
+
               const SizedBox(height: 40),
-              
+
               SizedBox(
                 width: double.infinity,
                 height: 50,

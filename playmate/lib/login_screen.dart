@@ -18,7 +18,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   String? _emailError;
   String? _passwordError;
@@ -62,14 +62,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final resp = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user_email': email,
-          'user_password': password,
-        }),
-      ).timeout(const Duration(seconds: 20));
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'user_email': email, 'user_password': password}),
+          )
+          .timeout(const Duration(seconds: 20));
 
       debugPrint('Login response: ${resp.statusCode} - ${resp.body}');
 
@@ -85,11 +84,17 @@ class _LoginScreenState extends State<LoginScreen> {
           final userData = data['data'];
           if (userData != null) {
             final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('user_id', userData['user_id']?.toString() ?? '');
+            await prefs.setString(
+              'user_id',
+              userData['user_id']?.toString() ?? '',
+            );
             await prefs.setString('user_email', userData['user_email'] ?? '');
             await prefs.setString('first_name', userData['first_name'] ?? '');
             await prefs.setString('last_name', userData['last_name'] ?? '');
-            await prefs.setString('profile_image', userData['profile_image'] ?? '');
+            await prefs.setString(
+              'profile_image',
+              userData['profile_image'] ?? '',
+            );
           }
         } catch (_) {}
 
@@ -99,9 +104,9 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -112,18 +117,28 @@ class _LoginScreenState extends State<LoginScreen> {
         try {
           final data = jsonDecode(resp.body);
           err = (data['message'] ?? data['error'] ?? err).toString();
+          
+          // Handle validation errors
+          if (data['errors'] != null && data['errors'] is Map) {
+            final errors = data['errors'] as Map<String, dynamic>;
+            setState(() {
+              _emailError = errors['email_error']?.toString();
+              _passwordError = errors['password_error']?.toString();
+            });
+            return; // Don't show general error if we have field-specific errors
+          }
         } catch (_) {}
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(err)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(err)));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Network error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Network error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -165,7 +180,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -201,9 +215,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icon(Icons.email_outlined, color: themeColor),
                     hintText: "Enter your email",
                     errorText: _emailError,
-                    errorStyle: const TextStyle(fontSize: 12),
+                    errorMaxLines: 3,
+                    errorStyle: TextStyle(
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
                     filled: true,
-                    fillColor: !_isLoading ? Colors.green.shade50 : Colors.grey.shade200,
+                    fillColor: !_isLoading
+                        ? Colors.green.shade50
+                        : Colors.grey.shade200,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: themeColor.withOpacity(.4)),
@@ -211,7 +231,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: _emailError != null ? Colors.red.shade300 : themeColor.withOpacity(.4),
+                        color: _emailError != null
+                            ? Colors.red.shade300
+                            : themeColor.withOpacity(.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -251,20 +273,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   enabled: !_isLoading,
                   decoration: InputDecoration(
                     prefixIcon: Icon(Icons.lock_outline, color: themeColor),
-                    suffixIcon: _isLoading ? null : IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.grey,
-                      ),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                    ),
+                    suffixIcon: _isLoading
+                        ? null
+                        : IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
+                            },
+                          ),
                     hintText: "Enter your password",
                     errorText: _passwordError,
-                    errorStyle: const TextStyle(fontSize: 12),
+                    errorMaxLines: 3,
+                    errorStyle: TextStyle(
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
                     filled: true,
-                    fillColor: !_isLoading ? Colors.green.shade50 : Colors.grey.shade200,
+                    fillColor: !_isLoading
+                        ? Colors.green.shade50
+                        : Colors.grey.shade200,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: themeColor.withOpacity(.4)),
@@ -272,7 +306,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: _passwordError != null ? Colors.red.shade300 : themeColor.withOpacity(.4),
+                        color: _passwordError != null
+                            ? Colors.red.shade300
+                            : themeColor.withOpacity(.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -336,7 +372,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 22,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : Text(
@@ -365,7 +403,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const RegistrationScreen()),
+                            builder: (context) => const RegistrationScreen(),
+                          ),
                         );
                       },
                       child: Text(
@@ -393,7 +432,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 1.4,
                       ),
                       children: [
-                        const TextSpan(text: "By continuing, you agree to our "),
+                        const TextSpan(
+                          text: "By continuing, you agree to our ",
+                        ),
                         TextSpan(
                           text: "Terms of Service",
                           style: TextStyle(
