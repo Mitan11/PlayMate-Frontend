@@ -6,11 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 class PostDetailScreen extends StatefulWidget {
   final File imageFile;
   final int postIndex;
+  final String? caption;
 
   const PostDetailScreen({
     super.key,
     required this.imageFile,
     required this.postIndex,
+    this.caption,
   });
 
   @override
@@ -149,32 +151,53 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   colors: [Colors.black.withOpacity(0.8), Colors.transparent],
                 ),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  GestureDetector(
-                    onTap: _toggleLike,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.all(8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: _isLiked ? Colors.red : Colors.white,
-                            size: 32,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '$_likeCount',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                  if (widget.caption != null && widget.caption!.isNotEmpty) ...[
+                    Text(
+                      widget.caption!,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
                       ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 16),
+                  ],
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _toggleLike,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isLiked ? Colors.red : Colors.white,
+                                size: 32,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '$_likeCount',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

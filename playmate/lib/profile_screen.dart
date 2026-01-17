@@ -17,8 +17,10 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   final Color themeColor = const Color(0xFF2E7D32);
+  late TabController _tabController;
 
   String _firstName = '';
   String _lastName = '';
@@ -46,10 +48,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadUserProfile();
     _loadUserSports();
     _loadAvailableSports();
     _loadUserPosts();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserProfile() async {
@@ -82,7 +91,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final data = jsonDecode(resp.body);
         final userData = data['data']['user'];
 
-        // Update SharedPreferences with latest data
         await prefs.setString('first_name', userData['first_name'] ?? '');
         await prefs.setString('last_name', userData['last_name'] ?? '');
         await prefs.setString('user_email', userData['user_email'] ?? '');
@@ -201,7 +209,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _addSport(int sportId, String skillLevel) async {
-    // Check if sport already exists
     final alreadyExists = _userSports.any((s) => s['sport_id'] == sportId);
     if (alreadyExists) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -252,8 +259,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: Colors.green,
           ),
         );
-
-        // Reload user sports from server to get latest data
         _loadUserSports();
       } else {
         final errorData = jsonDecode(resp.body);
@@ -343,7 +348,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (resp.statusCode == 200) {
-        // Remove sport from local list
         setState(() {
           _userSports.removeWhere(
             (sport) => sport['user_sport_id'] == userSportId,
@@ -356,8 +360,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: Colors.green,
           ),
         );
-
-        // Reload user sports from server to sync with backend
         _loadUserSports();
       } else {
         final errorData = jsonDecode(resp.body);
@@ -406,8 +408,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // Show loading or empty state
                 if (_availableSports.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -464,7 +464,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
-
                 const SizedBox(height: 16),
                 Text(
                   'Skill Level',
@@ -548,843 +547,298 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildModernProfileHeader() {
     return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF9CCC65),
-            const Color(0xFF4CAF50),
-            themeColor,
-            const Color(0xFF1B8E7A),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: const [0.0, 0.3, 0.7, 1.0],
-        ),
-      ),
-      child: Stack(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Animated background blobs
-          Positioned(
-            top: -80,
-            right: -60,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.15),
-                    Colors.white.withOpacity(0.05),
-                    Colors.transparent,
-                  ],
+          // Row 1: Avatar + Stats
+          Row(
+            children: [
+              // Avatar
+              Container(
+                margin: const EdgeInsets.only(right: 20),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [themeColor, const Color(0xFF66BB6A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 40,
+                  backgroundColor: Colors.white,
+                  backgroundImage: _profileImage.isNotEmpty
+                      ? NetworkImage(_profileImage)
+                      : null,
+                  child: _profileImage.isEmpty
+                      ? Icon(Icons.person, size: 40, color: Colors.grey[400])
+                      : null,
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            top: 120,
-            left: -40,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.1),
-                    Colors.white.withOpacity(0.03),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -30,
-            right: 100,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [Colors.white.withOpacity(0.08), Colors.transparent],
-                ),
-              ),
-            ),
-          ),
 
-          // Main content
-          Padding(
-            padding: const EdgeInsets.only(top: 40, bottom: 24),
-            child: Column(
-              children: [
-                // Profile Picture with glassmorphism
-                Stack(
-                  alignment: Alignment.center,
+              // Stats
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // Outer glow
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            Colors.white.withOpacity(0.3),
-                            Colors.white.withOpacity(0.1),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Glass effect container
-                    Container(
-                      width: 90,
-                      height: 90,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withOpacity(0.25),
-                            Colors.white.withOpacity(0.1),
-                          ],
-                        ),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 30,
-                            offset: const Offset(0, 15),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(45),
-                        child: Container(
-                          margin: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey[100],
-                          ),
-                          child: CircleAvatar(
-                            radius: 39,
-                            backgroundColor: Colors.transparent,
-                            backgroundImage: _profileImage.isNotEmpty
-                                ? NetworkImage(_profileImage)
-                                : null,
-                            child: _profileImage.isEmpty
-                                ? Icon(
-                                    Icons.person_outline,
-                                    color: themeColor.withOpacity(0.7),
-                                    size: 40,
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ),
+                    _buildStatItem('${_userPosts.length}', 'Posts'),
+                    _buildStatItem('${_userSports.length}', 'Sports'),
                   ],
                 ),
-                const SizedBox(height: 16),
+              ),
+            ],
+          ),
 
-                // Name with modern typography
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    '$_firstName $_lastName',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                      height: 1.1,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-                // Email with glassmorphism effect
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.25),
-                        Colors.white.withOpacity(0.1),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 15,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.alternate_email,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _userEmail,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white.withOpacity(0.95),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Edit Profile Button with modern design
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Container(
-                    width: double.infinity,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.white, Colors.white.withOpacity(0.95)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                        BoxShadow(
-                          color: Colors.white.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, -3),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const EditProfileScreen(),
-                            ),
-                          );
-                          if (result == true && mounted) {
-                            _loadUserProfile();
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(28),
-                        child: Container(
-                          alignment: Alignment.center,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: themeColor.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.edit_outlined,
-                                  color: themeColor,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Edit Profile',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: themeColor,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+          // Name
+          Text(
+            '$_firstName $_lastName',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
             ),
           ),
 
-          // Settings button with modern design
-          Positioned(
-            top: 20,
-            right: 20,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.25),
-                    Colors.white.withOpacity(0.1),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    );
-                  },
-                  customBorder: const CircleBorder(),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    child: Icon(Icons.tune, color: Colors.white, size: 22),
-                  ),
-                ),
+          // Bio / Email (Acting as bio for now)
+          if (_userEmail.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                _userEmail,
+                style: GoogleFonts.poppins(fontSize: 14, color: Colors.black54),
               ),
             ),
+
+          const SizedBox(height: 20),
+
+          // Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen(),
+                        ),
+                      );
+                      if (result == true && mounted) {
+                        _loadUserProfile();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEFEFEF),
+                      foregroundColor: Colors.black87,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: Text(
+                      'Edit Profile',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => SettingsScreen()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEFEFEF),
+                      foregroundColor: Colors.black87,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: Text(
+                      'Settings',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSportsSection() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Floating section header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.white, Colors.white.withOpacity(0.9)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.8),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 30,
-                  offset: const Offset(0, 15),
-                ),
-                BoxShadow(
-                  color: Colors.white.withOpacity(0.9),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  themeColor,
-                                  themeColor.withOpacity(0.8),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.emoji_events_outlined,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Sports & Skills',
-                              style: GoogleFonts.poppins(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF1A1A1A),
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              themeColor.withOpacity(0.1),
-                              themeColor.withOpacity(0.05),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${_userSports.length} sport${_userSports.length != 1 ? 's' : ''} mastered',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            color: themeColor,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Floating add button with neumorphism
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [themeColor, themeColor.withOpacity(0.8)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: themeColor.withOpacity(0.4),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.8),
-                        blurRadius: 10,
-                        offset: const Offset(0, -5),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _showAddSportDialog,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.add_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+  // Adjusted Stat Item for black text on white background
+  Widget _buildStatItem(String count, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          count,
+          style: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
           ),
-          const SizedBox(height: 24),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            color: Colors.black54,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+  }
 
-          // Sports cards with advanced styling
-          if (_userSports.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(48),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.white, Colors.grey[50]!],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: Colors.grey[200]!, width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 30,
-                    offset: const Offset(0, 15),
-                  ),
-                  BoxShadow(
-                    color: Colors.white,
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          themeColor.withOpacity(0.1),
-                          themeColor.withOpacity(0.05),
-                        ],
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: themeColor.withOpacity(0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.sports_outlined,
-                      size: 40,
-                      color: themeColor.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'No Sports Yet',
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF2A2A2A),
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Add your favorite sports and skill levels\nto connect with like-minded players',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      color: Colors.grey[600],
-                      height: 1.6,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.9,
-              ),
-              itemCount: _userSports.length,
-              itemBuilder: (context, index) {
-                final userSport = _userSports[index];
-                final sportName = userSport['sport_name'] ?? 'Unknown';
-                final skillLevel = userSport['skill_level'] ?? 'Beginner';
-                final skillColor = _getSkillLevelColor(skillLevel);
-
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.white, Colors.grey[50]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: Colors.grey[200]!, width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        blurRadius: 25,
-                        offset: const Offset(0, 12),
-                      ),
-                      BoxShadow(
-                        color: Colors.white,
-                        blurRadius: 8,
-                        offset: const Offset(0, -3),
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    children: [
-                      // Background pattern
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              colors: [
-                                themeColor.withOpacity(0.05),
-                                Colors.transparent,
-                              ],
-                            ),
-                            borderRadius: const BorderRadius.only(
-                              topRight: Radius.circular(28),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Sport icon with neumorphism
-                            Container(
-                              width: 54,
-                              height: 54,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    themeColor.withOpacity(0.1),
-                                    themeColor.withOpacity(0.05),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: themeColor.withOpacity(0.1),
-                                    blurRadius: 15,
-                                    offset: const Offset(3, 3),
-                                  ),
-                                  BoxShadow(
-                                    color: Colors.white,
-                                    blurRadius: 10,
-                                    offset: const Offset(-2, -2),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                _sportIcons[sportName] ?? Icons.sports,
-                                color: themeColor,
-                                size: 26,
-                              ),
-                            ),
-                            const Spacer(),
-
-                            // Sport name
-                            Text(
-                              sportName,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 17,
-                                color: const Color(0xFF1A1A1A),
-                                letterSpacing: -0.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Skill level with modern badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    skillColor.withOpacity(0.15),
-                                    skillColor.withOpacity(0.08),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: skillColor.withOpacity(0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                skillLevel,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: skillColor,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Floating delete button
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.white, Colors.grey[100]!],
-                            ),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.grey[300]!,
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(2, 2),
-                              ),
-                              BoxShadow(
-                                color: Colors.white,
-                                blurRadius: 5,
-                                offset: const Offset(-1, -1),
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                _deleteSport(userSport['user_sport_id']);
-                              },
-                              customBorder: const CircleBorder(),
-                              child: Container(
-                                alignment: Alignment.center,
-                                child: Icon(
-                                  Icons.close_rounded,
-                                  color: Colors.red[400],
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+  Widget _buildTabBar() {
+    return Container(
+      color: Colors.white,
+      child: TabBar(
+        controller: _tabController,
+        labelColor: themeColor,
+        unselectedLabelColor: Colors.grey[400],
+        indicatorColor: themeColor,
+        indicatorWeight: 3,
+        labelStyle: GoogleFonts.poppins(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+        ),
+        tabs: const [
+          Tab(icon: Icon(Icons.grid_on_rounded), text: 'Posts'),
+          Tab(icon: Icon(Icons.emoji_events_rounded), text: 'Sports'),
         ],
       ),
     );
   }
 
   Widget _buildPostsSection() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+    return Padding(
+      padding: const EdgeInsets.all(5),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Posts',
-                      style: GoogleFonts.poppins(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
+          if (_userPosts.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: themeColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.photo_camera_outlined,
+                      size: 48,
+                      color: themeColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No Posts Yet',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Share your sports moments with the community',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CreatePostScreen(),
+                        ),
+                      );
+                      if (result == true && mounted) {
+                        _loadUserPosts();
+                      }
+                    },
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: Text(
+                      'Create First Post',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_userPosts.length} post${_userPosts.length != 1 ? 's' : ''} shared',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            // Post Count and Add Button (Unchanged logic, just keeping context)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${_userPosts.length} Post${_userPosts.length != 1 ? 's' : ''}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
                     ),
-                  ],
-                ),
-                if (_userPosts.isNotEmpty)
+                  ),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [themeColor, themeColor.withOpacity(0.8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: themeColor.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      shape: BoxShape.circle,
                     ),
                     child: IconButton(
                       onPressed: () async {
@@ -1401,140 +855,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: const Icon(
                         Icons.add,
                         color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          if (_userPosts.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: themeColor.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.photo_camera_outlined,
-                      size: 48,
-                      color: themeColor.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No posts yet',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Share your sports moments\nwith the community',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [themeColor, themeColor.withOpacity(0.8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: themeColor.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const CreatePostScreen(),
-                          ),
-                        );
-                        if (result == true && mounted) {
-                          _loadUserPosts();
-                        }
-                      },
-                      icon: const Icon(
-                        Icons.add_photo_alternate_outlined,
                         size: 20,
                       ),
-                      label: Text(
-                        'Create your first post',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        foregroundColor: Colors.white,
-                        shadowColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
                     ),
                   ),
                 ],
               ),
-            )
-          else
+            ),
+            const SizedBox(height: 12),
+
+            // Instagram-style Grid
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                crossAxisSpacing: 1,
+                mainAxisSpacing: 1,
                 childAspectRatio: 1,
               ),
               itemCount: _userPosts.length,
               itemBuilder: (context, index) {
+                // Parse post data (handle plain path vs JSON)
+                String imagePath = _userPosts[index];
+                String? caption;
+
+                try {
+                  if (imagePath.trim().startsWith('{')) {
+                    final Map<String, dynamic> data = jsonDecode(imagePath);
+                    imagePath = data['path'] ?? '';
+                    caption = data['caption'];
+                  }
+                } catch (e) {
+                  // Fallback to treat as simple path
+                }
+
+                if (imagePath.isEmpty) return const SizedBox();
+
                 return GestureDetector(
                   onTap: () async {
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => PostDetailScreen(
-                          imageFile: File(_userPosts[index]),
+                          imageFile: File(imagePath),
                           postIndex: index,
+                          caption: caption,
                         ),
                       ),
                     );
@@ -1543,133 +909,266 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     }
                   },
                   child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Stack(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              image: DecorationImage(
-                                image: FileImage(File(_userPosts[index])),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          // Overlay for better visual effect
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.1),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    color: Colors.grey[200],
+                    child: Image.file(
+                      File(imagePath),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(Icons.broken_image, color: Colors.grey),
+                        );
+                      },
                     ),
                   ),
                 );
               },
             ),
+            const SizedBox(height: 40),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildSportsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'My Sports',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _showAddSportDialog,
+                icon: Icon(
+                  Icons.add_circle_outline,
+                  size: 18,
+                  color: themeColor,
+                ),
+                label: Text(
+                  'Add New',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: themeColor,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        if (_userSports.isEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.sports_basketball_outlined,
+                  size: 50,
+                  color: Colors.grey.shade300,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No Sports Added Yet',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add sports to find partners nearby',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 100, // Reduced height for compact look
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              itemCount: _userSports.length,
+              itemBuilder: (context, index) {
+                final userSport = _userSports[index];
+                final sportName = userSport['sport_name'] ?? 'Unknown';
+                final skillLevel = userSport['skill_level'] ?? 'Beginner';
+                final skillColor = _getSkillLevelColor(skillLevel);
+
+                return Container(
+                  width: 280, // Wider card for horizontal details
+                  margin: const EdgeInsets.only(right: 16, bottom: 4, top: 4),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      // Sport Icon
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: themeColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _sportIcons[sportName] ?? Icons.sports,
+                          color: themeColor,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+
+                      // Details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              sportName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: skillColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                skillLevel,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: skillColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Delete Button
+                      InkWell(
+                        onTap: () => _deleteSport(userSport['user_sport_id']),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 20,
+                            color: Colors.red[400],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 30),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFFAFAFA),
       body: _isLoadingProfile
           ? Center(
-              child: Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.white, Colors.grey[50]!],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.grey[200]!, width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 30,
-                      offset: const Offset(0, 15),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [themeColor, themeColor.withOpacity(0.8)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    BoxShadow(
-                      color: Colors.white,
-                      blurRadius: 10,
-                      offset: const Offset(0, -5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [themeColor, themeColor.withOpacity(0.8)],
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          SizedBox(
-                            width: 30,
-                            height: 30,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 3,
-                            ),
-                          ),
-                          Icon(
-                            Icons.person_outline,
-                            color: Colors.white.withOpacity(0.3),
-                            size: 24,
-                          ),
-                        ],
-                      ),
+                        Icon(
+                          Icons.person_outline,
+                          color: Colors.white.withOpacity(0.3),
+                          size: 24,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Loading your profile',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF2A2A2A),
-                      ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Loading your profile',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF2A2A2A),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Getting everything ready...',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             )
           : RefreshIndicator(
@@ -1679,18 +1178,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: themeColor,
               backgroundColor: Colors.white,
               strokeWidth: 3,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                  SliverToBoxAdapter(child: _buildModernProfileHeader()),
+                  SliverAppBar(
+                    backgroundColor: Colors.white,
+                    elevation: innerBoxIsScrolled ? 0.5 : 0,
+                    floating: true,
+                    pinned: true,
+                    toolbarHeight: 0,
+                    flexibleSpace: Container(color: Colors.white),
+                    bottom: PreferredSize(
+                      preferredSize: const Size.fromHeight(80),
+                      child: _buildTabBar(),
+                    ),
+                  ),
+                ],
+                body: TabBarView(
+                  controller: _tabController,
                   children: [
-                    _buildProfileHeader(),
-                    const SizedBox(height: 16),
-                    _buildSportsSection(),
-                    const SizedBox(height: 16),
-                    _buildPostsSection(),
-                    const SizedBox(height: 120),
+                    SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: _buildPostsSection(),
+                    ),
+                    SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: _buildSportsSection(),
+                    ),
                   ],
                 ),
               ),

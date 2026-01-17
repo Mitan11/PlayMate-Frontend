@@ -3,10 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:playmate/login_screen.dart';
 import 'package:playmate/change_password_screen.dart';
+import 'package:playmate/help_support_screen.dart';
+import 'package:playmate/about_screen.dart';
+import 'package:playmate/privacy_policy_screen.dart';
+
+// ... existing imports
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
-
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
@@ -157,22 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
-            _buildMenuItem(
-              icon: Icons.notifications_outlined,
-              title: 'Notifications',
-              subtitle: 'Manage notification preferences',
-              onTap: () {
-                // Navigate to notifications settings
-              },
-            ),
-            _buildMenuItem(
-              icon: Icons.location_on_outlined,
-              title: 'Location',
-              subtitle: 'Update your location',
-              onTap: () {
-                // Navigate to location settings
-              },
-            ),
+
             const SizedBox(height: 16),
 
             // Support Section
@@ -192,7 +180,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Help & Support',
               subtitle: 'Get help and support',
               onTap: () {
-                // Navigate to help
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                );
               },
             ),
             _buildMenuItem(
@@ -200,14 +191,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'About',
               subtitle: 'App version 1.0.0',
               onTap: () {
-                // Show about dialog
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AboutScreen()),
+                );
               },
             ),
             _buildMenuItem(
               icon: Icons.privacy_tip_outlined,
               title: 'Privacy Policy',
               onTap: () {
-                // Navigate to privacy policy
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacyPolicyScreen(),
+                  ),
+                );
               },
             ),
             const SizedBox(height: 16),
