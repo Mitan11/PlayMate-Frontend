@@ -89,8 +89,7 @@ function VenueManagement() {
         () =>
             venues.map((venue, index) => {
                 const sportsText = venue.sports?.map(sport => 
-                    `${sport.sport_name} (₹${sport.price_per_hour}/hr)`
-                ).join(', ') || 'No sports available'
+                    `${sport.sport_name}`).join(', ') || 'No sports available'
 
                 return {
                     no: index + 1,
