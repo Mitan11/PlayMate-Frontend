@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:playmate/login_screen.dart';
 import 'package:playmate/profile_screen.dart';
 import 'package:playmate/create_post_screen.dart';
+import 'package:playmate/post_detail_screen.dart';
+import 'dart:convert';
+import 'dart:io';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,11 +22,47 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userName = 'User';
   String _userEmail = '';
   String _profileImage = '';
+  List<String> _userPosts = [];
+  Map<int, bool> _likedPosts = {};
+  Map<int, int> _postLikes = {};
+
+  final List<Map<String, dynamic>> _dummyPosts = [
+    {
+      'name': 'Rahul Kumar',
+      'time': '2h ago',
+      'text': 'Looking for a tennis partner for this weekend! 🎾',
+      'likes': 12,
+      'comments': 4,
+    },
+    {
+      'name': 'Priya Singh',
+      'time': '4h ago',
+      'text':
+          'Had an amazing badminton match today. The court facilities were top notch! 🏸',
+      'likes': 85,
+      'comments': 12,
+    },
+    {
+      'name': 'Amit Patel',
+      'time': '6h ago',
+      'text': 'Just finished a 10k run. Feeling pumped! 🏃‍♂️',
+      'likes': 42,
+      'comments': 8,
+    },
+    {
+      'name': 'Sneha Gupta',
+      'time': '1d ago',
+      'text': 'Anyone interested in a friendly cricket match this Sunday?',
+      'likes': 28,
+      'comments': 15,
+    },
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadUserPosts();
   }
 
   Future<void> _loadUserData() async {
@@ -107,11 +146,22 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _selectedIndex == 0
-          ? _buildHomeTab()
-          : _selectedIndex == 3
-          ? const ProfileScreen()
-          : _buildPlaceholder(),
+      body: Builder(
+        builder: (context) {
+          switch (_selectedIndex) {
+            case 0:
+              return _buildHomeTab();
+            case 1:
+              return _buildPlayTab();
+            case 2:
+              return _buildBookingTab();
+            case 3:
+              return const ProfileScreen();
+            default:
+              return _buildPlaceholder();
+          }
+        },
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -162,205 +212,694 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeTab() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // User Greeting Card
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [themeColor, themeColor.withOpacity(0.8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadUserData();
+        // Simulate a small delay for better UX or if data loads too fast
+        await Future.delayed(const Duration(milliseconds: 500));
+      },
+      color: themeColor,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // User Greeting Card
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [themeColor, themeColor.withOpacity(0.8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: themeColor.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundColor: Colors.white,
+                    backgroundImage: _profileImage.isNotEmpty
+                        ? NetworkImage(_profileImage)
+                        : null,
+                    child: _profileImage.isEmpty
+                        ? Icon(Icons.person, color: themeColor, size: 32)
+                        : null,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Welcome back! 👋',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          _userName.trim(),
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (_userEmail.isNotEmpty)
+                          Text(
+                            _userEmail,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Posts Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Recent Activities',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _dummyPosts.length,
+              separatorBuilder: (context, index) =>
+                  Divider(height: 1, color: Colors.grey.shade200),
+              itemBuilder: (context, index) {
+                return _buildDummyPostItem(index);
+              },
+            ),
+
+            const SizedBox(height: 80),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadUserPosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+    if (userId != null) {
+      setState(() {
+        _userPosts = prefs.getStringList('user_posts_$userId') ?? [];
+      });
+    }
+  }
+
+  Widget _buildPlayTab() {
+    final List<Map<String, dynamic>> playItems = [
+      {
+        'sport': 'Tennis',
+        'image': 'assets/images/tennis_court.jpg',
+        'title': 'Evening Doubles Match',
+        'location': 'Green Valley Club',
+        'distance': '2.5 km',
+        'players': '3/4',
+        'level': 'Intermediate',
+      },
+      {
+        'sport': 'Badminton',
+        'image': '',
+        'title': 'Weekend Badminton',
+        'location': 'City Sports Complex',
+        'distance': '4.0 km',
+        'players': '2/4',
+        'level': 'Beginner',
+      },
+      {
+        'sport': 'Cricket',
+        'image': '',
+        'title': 'Friendly Box Cricket',
+        'location': 'Metro Turf',
+        'distance': '1.2 km',
+        'players': '8/12',
+        'level': 'All Levels',
+      },
+    ];
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Simulate data reload
+        await Future.delayed(const Duration(milliseconds: 500));
+        setState(() {}); // Refresh UI
+      },
+      color: themeColor,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: playItems.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          final item = playItems[index];
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: themeColor.withOpacity(0.3),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: Colors.white,
-                  backgroundImage: _profileImage.isNotEmpty
-                      ? NetworkImage(_profileImage)
-                      : null,
-                  child: _profileImage.isEmpty
-                      ? Icon(Icons.person, color: themeColor, size: 32)
-                      : null,
+                Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      item['sport'] == 'Tennis'
+                          ? Icons.sports_tennis
+                          : item['sport'] == 'Badminton'
+                          ? Icons.sports_tennis_outlined
+                          : Icons.sports_cricket,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
+                Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Welcome back! 👋',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        _userName.trim(),
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (_userEmail.isNotEmpty)
-                        Text(
-                          _userEmail,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Posts Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              'Recent Activities',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 5,
-            itemBuilder: (context, index) {
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.green.shade100,
-                            child: Icon(
-                              Icons.person,
-                              color: themeColor,
-                              size: 20,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: themeColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              item['sport'],
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: themeColor,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          Text(
+                            item['distance'],
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        item['title'],
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            item['location'],
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Player Name',
+                                  'Players joined',
                                   style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
                                   ),
                                 ),
                                 Text(
-                                  '2 hours ago',
+                                  item['players'],
                                   style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.more_vert),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Level',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                                Text(
+                                  item['level'],
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
                             onPressed: () {},
-                            color: Colors.grey[600],
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: themeColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 0,
+                              ),
+                              minimumSize: const Size(0, 36),
+                            ),
+                            child: Text(
+                              'Join',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBookingTab() {
+    final List<Map<String, dynamic>> bookingItems = [
+      {
+        'sport': 'Badminton',
+        'date': 'Tomorrow, 20 Jan',
+        'time': '06:00 PM - 07:00 PM',
+        'venue': 'Smash Arena',
+        'status': 'Confirmed',
+        'court': 'Court 3',
+      },
+      {
+        'sport': 'Tennis',
+        'date': 'Sat, 24 Jan',
+        'time': '07:00 AM - 08:30 AM',
+        'venue': 'Green Valley Club',
+        'status': 'Pending',
+        'court': 'Clay Court 1',
+      },
+    ];
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Simulate data reload
+        await Future.delayed(const Duration(milliseconds: 500));
+        setState(() {}); // Refresh UI
+      },
+      color: themeColor,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: bookingItems.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          final item = bookingItems[index];
+          final bool isConfirmed = item['status'] == 'Confirmed';
+
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border(
+                left: BorderSide(
+                  color: isConfirmed ? Colors.green : Colors.orange,
+                  width: 4,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      item['sport'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
                       ),
                     ),
                     Container(
-                      height: 200,
-                      decoration: BoxDecoration(color: Colors.grey[200]),
-                      child: Center(
-                        child: Icon(
-                          Icons.sports_tennis,
-                          size: 60,
-                          color: Colors.grey[400],
-                        ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.favorite_border),
-                            color: themeColor,
-                            onPressed: () {},
-                          ),
-                          Text(
-                            '3',
-                            style: GoogleFonts.poppins(
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Icon(Icons.comment_outlined, color: Colors.grey[600]),
-                          const SizedBox(width: 8),
-                          Text(
-                            '5',
-                            style: GoogleFonts.poppins(
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                      decoration: BoxDecoration(
+                        color: isConfirmed
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        item['status'],
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isConfirmed ? Colors.green : Colors.orange,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      item['date'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 16,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      item['time'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      item['venue'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(height: 1, color: Colors.grey.shade200),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      item['court'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      'View Ticket',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: themeColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-          const SizedBox(height: 80),
+  void _toggleLike(int index) {
+    setState(() {
+      if (_likedPosts[index] == true) {
+        _likedPosts[index] = false;
+        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) - 1;
+      } else {
+        _likedPosts[index] = true;
+        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) + 1;
+      }
+    });
+  }
+
+  Future<void> _deletePostAtIndex(int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Delete Post',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Are you sure you want to delete this post?',
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final userId = prefs.getString('user_id');
+        if (userId != null) {
+          final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
+          if (index >= 0 && index < currentPosts.length) {
+            currentPosts.removeAt(index);
+            await prefs.setStringList('user_posts_$userId', currentPosts);
+            _loadUserPosts();
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Post deleted successfully',
+                  style: GoogleFonts.poppins(),
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting post: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildDummyPostItem(int index) {
+    final post = _dummyPosts[index];
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.blue.shade100,
+            child: Text(
+              post['name'][0],
+              style: GoogleFonts.poppins(
+                color: Colors.blue.shade800,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      post['name'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '·',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      post['time'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  post['text'],
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.favorite_border,
+                      size: 20,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${post['likes']}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

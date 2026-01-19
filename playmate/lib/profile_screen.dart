@@ -1270,113 +1270,111 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           )
         else
-          SizedBox(
-            height: 100, // Reduced height for compact look
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              scrollDirection: Axis.horizontal,
-              itemCount: _userSports.length,
-              itemBuilder: (context, index) {
-                final userSport = _userSports[index];
-                final sportName = userSport['sport_name'] ?? 'Unknown';
-                final skillLevel = userSport['skill_level'] ?? 'Beginner';
-                final skillColor = _getSkillLevelColor(skillLevel);
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _userSports.length,
+            itemBuilder: (context, index) {
+              final userSport = _userSports[index];
+              final sportName = userSport['sport_name'] ?? 'Unknown';
+              final skillLevel = userSport['skill_level'] ?? 'Beginner';
+              final skillColor = _getSkillLevelColor(skillLevel);
 
-                return Container(
-                  width: 280, // Wider card for horizontal details
-                  margin: const EdgeInsets.only(right: 16, bottom: 4, top: 4),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade200),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Sport Icon
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: themeColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      // Sport Icon
-                      Container(
-                        width: 50,
-                        height: 50,
+                      child: Icon(
+                        _sportIcons[sportName] ?? Icons.sports,
+                        color: themeColor,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            sportName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: skillColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              skillLevel,
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: skillColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Delete Button
+                    InkWell(
+                      onTap: () => _deleteSport(userSport['user_sport_id']),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: themeColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.red.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
-                          _sportIcons[sportName] ?? Icons.sports,
-                          color: themeColor,
-                          size: 26,
+                          Icons.delete_outline_rounded,
+                          size: 20,
+                          color: Colors.red[400],
                         ),
                       ),
-                      const SizedBox(width: 14),
-
-                      // Details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              sportName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: skillColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                skillLevel,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: skillColor,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Delete Button
-                      InkWell(
-                        onTap: () => _deleteSport(userSport['user_sport_id']),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.delete_outline_rounded,
-                            size: 20,
-                            color: Colors.red[400],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         const SizedBox(height: 30),
       ],
@@ -1434,12 +1432,22 @@ class _ProfileScreenState extends State<ProfileScreen>
             )
           : RefreshIndicator(
               onRefresh: () async {
-                await Future.wait([_loadUserProfile(), _loadUserSports()]);
+                await Future.wait([
+                  _loadUserProfile(),
+                  _loadUserSports(),
+                  _loadAvailableSports(),
+                  _loadUserPosts(),
+                ]);
+                await Future.delayed(const Duration(milliseconds: 500));
+              },
+              notificationPredicate: (notification) {
+                return notification.depth <= 2;
               },
               color: themeColor,
               backgroundColor: Colors.white,
               strokeWidth: 3,
               child: NestedScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 headerSliverBuilder: (context, innerBoxIsScrolled) => [
                   SliverToBoxAdapter(child: _buildModernProfileHeader()),
                   SliverAppBar(
