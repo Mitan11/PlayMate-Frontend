@@ -205,8 +205,7 @@ function AdminAnalytics() {
             <Preloader />
         );
     }
-    console.log(mostBookedVenuesData);
-    console.log(mostPlayedSportsData);
+    console.log(mostLikedPostsData)
     return (
         <Box sx={{ p: 3, maxWidth: '100%', overflow: 'hidden' }}>
             <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

@@ -65,9 +65,11 @@ export default function Modalbox({
                         <Button variant="plain" color="neutral" onClick={handleCancel}>
                             {cancelText}
                         </Button>
-                        <Button variant="soft" color={color} onClick={handleConfirm}>
-                            {confirmText}
-                        </Button>
+                        {onConfirm && (
+                            <Button variant="soft" color={color} onClick={handleConfirm}>
+                                {confirmText}
+                            </Button>
+                        )}
                     </Box>
                 )}
             </Sheet>

@@ -220,6 +220,8 @@ function SportsManagement() {
     const actions = useMemo(() => [
         {
             label: 'Edit',
+            color: 'warning',
+            variant: 'soft',
             onClick: (row) => handleEditClick(row),
         },
         {

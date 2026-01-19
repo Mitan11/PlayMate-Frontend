@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/joy/Box';
 import Button from '@mui/joy/Button';
 import Table from '@mui/joy/Table';
@@ -18,23 +18,69 @@ function DataTable({
     searchable = true,
     searchPlaceholder = "Search...",
     pageSize = 7,
+    debounceDelay = 300,
+    throttleDelay = 100,
 }) {
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState();
     const [page, setPage] = useState(1);
+    const debounceTimeoutRef = useRef(null);
+    const throttleTimeoutRef = useRef(null);
+    const lastThrottleTime = useRef(0);
 
-    // Filter rows based on search query
+    // Debounce function
+    const debounce = useCallback((func, delay) => {
+        return (...args) => {
+            clearTimeout(debounceTimeoutRef.current);
+            debounceTimeoutRef.current = setTimeout(() => func(...args), delay);
+        };
+    }, []);
+
+    // Throttle function
+    const throttle = useCallback((func, delay) => {
+        return (...args) => {
+            const now = Date.now();
+            if (now - lastThrottleTime.current >= delay) {
+                lastThrottleTime.current = now;
+                func(...args);
+            } else if (!throttleTimeoutRef.current) {
+                throttleTimeoutRef.current = setTimeout(() => {
+                    lastThrottleTime.current = Date.now();
+                    func(...args);
+                    throttleTimeoutRef.current = null;
+                }, delay - (now - lastThrottleTime.current));
+            }
+        };
+    }, []);
+
+    // Debounced search handler
+    const debouncedSetSearchQuery = useCallback(
+        debounce((query) => {
+            setDebouncedSearchQuery(query);
+        }, debounceDelay),
+        [debounce, debounceDelay]
+    );
+
+    // Handle search input change
+    const handleSearchChange = useCallback((e) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        debouncedSetSearchQuery(value);
+    }, [debouncedSetSearchQuery]);
+
+    // Filter rows based on debounced search query
     const filteredRows = useMemo(() => {
-        if (!searchQuery) return rows;
+        if (!debouncedSearchQuery) return rows;
 
         return rows.filter((row) =>
             columns.some((col) =>
                 String(row[col.key] ?? '')
                     .toLowerCase()
-                    .includes(searchQuery.toLowerCase())
+                    .includes(debouncedSearchQuery.toLowerCase())
             )
         );
-    }, [rows, searchQuery, columns]);
+    }, [rows, debouncedSearchQuery, columns]);
 
     // Sort filtered rows
     const sortedRows = useMemo(() => {
@@ -69,15 +115,22 @@ function DataTable({
     // Calculate total pages
     const totalPages = Math.ceil(sortedRows.length / pageSize);
 
-    // Reset page when search changes
+    // Reset page when debounced search or sort changes
     useEffect(() => {
         setPage(1);
-    }, [searchQuery, sortConfig]);
+    }, [debouncedSearchQuery, sortConfig]);
 
+    // Cleanup timeouts on unmount
     useEffect(() => {
-        const t = setTimeout(() => setPage(1), 300);
-        return () => clearTimeout(t);
-    }, [searchQuery]);
+        return () => {
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
+            if (throttleTimeoutRef.current) {
+                clearTimeout(throttleTimeoutRef.current);
+            }
+        };
+    }, []);
 
 
     return (
@@ -88,7 +141,7 @@ function DataTable({
                     <Input
                         placeholder={searchPlaceholder}
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={handleSearchChange}
                         sx={{ width: '100%' }}
                     />
                 </Box>
@@ -135,7 +188,7 @@ function DataTable({
                                         cursor: 'pointer',
                                         userSelect: 'none'
                                     }}
-                                    onClick={() => {
+                                    onClick={throttle(() => {
                                         setSortConfig((prev) => ({
                                             key: col.key,
                                             direction:
@@ -143,7 +196,7 @@ function DataTable({
                                                     ? 'desc'
                                                     : 'asc',
                                         }))
-                                    }}
+                                    }, throttleDelay)}
                                 >
                                     {col.label}
                                     {sortConfig?.key === col.key &&

@@ -68,6 +68,26 @@ function Sidebar() {
                             />
                         </div>
                     </Tooltip>
+                    <Tooltip title="Venue Management" placement="right" disableHoverListener={!isMobile}>
+                        <div>
+                            <NavItem
+                                to="/venue-management"
+                                icon={assets.venue_icon}
+                                text={isMobile ? "" : "Venue Management"}
+                                centerIcon={isMobile}
+                            />
+                        </div>
+                    </Tooltip>
+                    <Tooltip title="Posts Management" placement="right" disableHoverListener={!isMobile}>
+                        <div>
+                            <NavItem
+                                to="/posts-management"
+                                icon={assets.posts_icon}
+                                text={isMobile ? "" : "Posts Management"}
+                                centerIcon={isMobile}
+                            />
+                        </div>
+                    </Tooltip>
                 </ul>
             </Box>
         </motion.aside>
