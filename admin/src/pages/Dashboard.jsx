@@ -55,8 +55,6 @@ function Dashboard() {
         }
     };
 
-    console.log("Stats:", stats);
-
     const containerVariants = {
         hidden: { opacity: 0, y: 10 },
         visible: {

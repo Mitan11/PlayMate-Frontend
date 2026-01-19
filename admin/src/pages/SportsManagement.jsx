@@ -340,12 +340,6 @@ function SportsManagement() {
                     </Box>
                 </Box>
 
-                {error && (
-                    <Box sx={{ color: 'danger.main', py: 2, px: 2, backgroundColor: 'danger.softBg', borderRadius: 'sm', mb: 2 }}>
-                        {error}
-                    </Box>
-                )}
-
                 <DataTable
                     columns={columns}
                     rows={rows}

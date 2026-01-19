@@ -250,7 +250,7 @@ function DataTable({
                                             color: 'neutral.500',
                                         }}
                                     >
-                                        {searchQuery ? 'No results found' : 'No sports found'}
+                                        {searchQuery ? 'No results found' : 'No data found'}
                                     </Box>
                                 </td>
                             </tr>

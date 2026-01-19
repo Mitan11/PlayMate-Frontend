@@ -52,9 +52,6 @@ function AdminAnalytics() {
             setLoading(true);
             const headers = { Authorization: `Bearer ${aToken}` };
 
-            console.log('Fetching analytics from:', backendUrl);
-            console.log('Using token:', aToken ? 'Token present' : 'No token');
-
             // Fetch all analytics data in parallel
             const [
                 userGrowthRes,
@@ -92,27 +89,11 @@ function AdminAnalytics() {
                 axios.get(`${backendUrl}/admin/dashboard/user/report`, { headers }).catch(() => ({ data: { data: [] } })),
             ]);
 
-            console.log('Raw API responses:', {
-                userGrowth: userGrowthRes.data,
-                venueGrowth: venueGrowthRes.data,
-                bookingTrend: bookingTrendRes.data,
-                monthlyRevenue: monthlyRevenueRes.data,
-                revenueByVenue: revenueByVenueRes.data,
-                revenueBySport: revenueBySportRes.data
-            });
-
             // Set new analytics data
             const formattedUserGrowth = formatMonthlyData(userGrowthRes.data.data || [], "users_registered");
             const formattedVenueGrowth = formatMonthlyData(venueGrowthRes.data.data || [], "venues_added");
             const formattedBookingTrend = formatDailyData(bookingTrendRes.data.data || [], "total_bookings");
             const formattedMonthlyRevenue = formatMonthlyData(monthlyRevenueRes.data.data || [], "revenue");
-
-            console.log('Formatted data:', {
-                userGrowth: formattedUserGrowth,
-                venueGrowth: formattedVenueGrowth,
-                bookingTrend: formattedBookingTrend,
-                monthlyRevenue: formattedMonthlyRevenue
-            });
 
             setUserGrowthData(formattedUserGrowth);
             setVenueGrowthData(formattedVenueGrowth);
@@ -125,10 +106,8 @@ function AdminAnalytics() {
                 revenue: parseFloat(item.revenue) || 0
             }));
 
-            console.log('Revenue by sport raw:', revenueBySportRes.data.data);
             const processedRevenueBySport = processRevenueData(revenueBySportRes.data.data || []);
-            console.log('Revenue by sport processed:', processedRevenueBySport);
-
+            
             setRevenueByVenueData(processRevenueData(revenueByVenueRes.data.data || []));
             setRevenueBySportData(processedRevenueBySport);
             setMostPlayedSportsData(mostPlayedSportsRes.data.data || []);
@@ -149,7 +128,7 @@ function AdminAnalytics() {
             setLoading(false);
         }
     };
-    console.log(revenueBySportData)
+
     // Format API data → chart friendly
     const formatData = (data, key = "bookings") =>
         data.map(item => ({
@@ -205,7 +184,7 @@ function AdminAnalytics() {
             <Preloader />
         );
     }
-    console.log(mostLikedPostsData)
+
     return (
         <Box sx={{ p: 3, maxWidth: '100%', overflow: 'hidden' }}>
             <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
