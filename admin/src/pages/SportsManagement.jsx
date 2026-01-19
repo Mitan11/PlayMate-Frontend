@@ -321,6 +321,7 @@ function SportsManagement() {
                             <Button
                                 variant="solid"
                                 color="primary"
+                                disabled={loading}
                                 onClick={handleAddClick}
                             >
                                 Add Sport

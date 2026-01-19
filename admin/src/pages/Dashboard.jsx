@@ -9,6 +9,7 @@ import { useNavigate } from "react-router";
 import axios from "axios";
 import { AppContext } from "../context/AppContextProvider";
 import { toast } from "react-hot-toast";
+import Preloader from "../components/Preloader";
 
 function Dashboard() {
     const navigate = useNavigate();
@@ -47,11 +48,14 @@ function Dashboard() {
             setRecentActivities(activitiesRes.data.data || []);
 
         } catch (error) {
-            toast.error("Failed to load dashboard data");
+            console.log("Error fetching dashboard data:", error);
+            // toast.error("Failed to load dashboard data");
         } finally {
             setLoading(false);
         }
     };
+
+    console.log("Stats:", stats);
 
     const containerVariants = {
         hidden: { opacity: 0, y: 10 },
@@ -69,9 +73,7 @@ function Dashboard() {
 
     if (loading) {
         return (
-            <Box sx={{ p: 3 }}>
-                <Typography level="body-md">Loading dashboard...</Typography>
-            </Box>
+            <Preloader />
         );
     }
 
@@ -113,23 +115,31 @@ function Dashboard() {
                         mb: 3,
                     }}
                 >
-                    {[
-                        { label: "Total Sports", value: stats.totalSports, icon: "⚽" },
-                        { label: "Active Sessions", value: stats.activeSessions, icon: "🎮" },
-                        { label: "Total Users", value: stats.totalUsers, icon: "👥" },
-                        { label: "Revenue", value: `₹${stats.totalRevenue}`, icon: "💰" },
-                    ].map((stat, index) => (
-                        <motion.div key={index} variants={itemVariants}>
-                            <Card variant="outlined" sx={{ p: 2 }}>
-                                <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                                    {stat.label}
-                                </Typography>
-                                <Typography level="h3">
-                                    {stat.icon} {stat.value}
-                                </Typography>
-                            </Card>
-                        </motion.div>
-                    ))}
+                    {stats ? (
+                        [
+                            { label: "Total Sports", value: stats?.totalSports || 0, icon: "⚽" },
+                            { label: "Active Sessions", value: stats?.activeSessions || 0, icon: "🎮" },
+                            { label: "Total Users", value: stats?.totalUsers || 0, icon: "👥" },
+                            { label: "Revenue", value: `₹${stats?.totalRevenue || 0}`, icon: "💰" },
+                            { label: "Total Venue", value: stats?.totalVenue || 0, icon: "🏟️" },
+                            { label: "Total Posts", value: stats?.totalPosts || 0, icon: "📝" },
+                        ].map((stat, index) => (
+                            <motion.div key={index} variants={itemVariants}>
+                                <Card variant="outlined" sx={{ p: 2 }}>
+                                    <Typography level="body-xs" sx={{ color: "neutral.500" }}>
+                                        {stat.label}
+                                    </Typography>
+                                    <Typography level="h3">
+                                        {stat.icon} {stat.value}
+                                    </Typography>
+                                </Card>
+                            </motion.div>
+                        ))
+                    ) : (
+                        <Typography level="body-sm" sx={{ color: "neutral.500", gridColumn: "1 / -1" }}>
+                            No statistics available
+                        </Typography>
+                    )}
                 </Box>
 
                 {/* Middle Grid */}
@@ -145,19 +155,25 @@ function Dashboard() {
                         <Typography level="h3" sx={{ mb: 2 }}>
                             Sports Popularity
                         </Typography>
-                        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            {sportMetrics.map((sport, index) => (
-                                <Box key={index}>
-                                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                                        <Typography level="body-sm">{sport.name}</Typography>
-                                        <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                                            {sport.users} users
-                                        </Typography>
+                        {sportMetrics && sportMetrics.length > 0 ? (
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                {sportMetrics.map((sport, index) => (
+                                    <Box key={index}>
+                                        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                            <Typography level="body-sm">{sport.name}</Typography>
+                                            <Typography level="body-xs" sx={{ color: "neutral.500" }}>
+                                                {sport.users} users
+                                            </Typography>
+                                        </Box>
+                                        <LinearProgress determinate value={sport.progress} />
                                     </Box>
-                                    <LinearProgress determinate value={sport.progress} />
-                                </Box>
-                            ))}
-                        </Box>
+                                ))}
+                            </Box>
+                        ) : (
+                            <Typography level="body-sm" sx={{ color: "neutral.500" }}>
+                                No sports data available
+                            </Typography>
+                        )}
                     </Card>
 
                     {/* Quick Actions */}
@@ -184,18 +200,24 @@ function Dashboard() {
                     <Typography level="h3" sx={{ mb: 2 }}>
                         Recent Activities
                     </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                        {recentActivities.map((activity, index) => (
-                            <Box key={index}>
-                                <Typography level="body-sm">
-                                    {activity.title}
-                                </Typography>
-                                <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                                    {activity.user} • {activity.time}
-                                </Typography>
-                            </Box>
-                        ))}
-                    </Box>
+                    {recentActivities && recentActivities.length > 0 ? (
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                            {recentActivities.map((activity, index) => (
+                                <Box key={index}>
+                                    <Typography level="body-sm">
+                                        {activity.title}
+                                    </Typography>
+                                    <Typography level="body-xs" sx={{ color: "neutral.500" }}>
+                                        {activity.user} • {activity.time}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Box>
+                    ) : (
+                        <Typography level="body-sm" sx={{ color: "neutral.500" }}>
+                            No recent activities available
+                        </Typography>
+                    )}
                 </Card>
             </Box>
         </motion.div>
