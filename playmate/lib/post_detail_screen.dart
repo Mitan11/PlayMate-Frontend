@@ -4,15 +4,17 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PostDetailScreen extends StatefulWidget {
-  final File imageFile;
+  final File? imageFile;
   final int postIndex;
   final String? caption;
+  final String? textContent;
 
   const PostDetailScreen({
     super.key,
-    required this.imageFile,
+    this.imageFile,
     required this.postIndex,
     this.caption,
+    this.textContent,
   });
 
   @override
@@ -23,45 +25,43 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   bool _isLiked = false;
   int _likeCount = 0;
   bool _isLoading = true;
+  final Color themeColor = const Color(0xFF2E7D32);
 
   @override
   void initState() {
     super.initState();
-    _loadLikeStatus();
+    _loadPostData();
   }
 
-  Future<void> _loadLikeStatus() async {
+  Future<void> _loadPostData() async {
     final prefs = await SharedPreferences.getInstance();
-    final String path = widget.imageFile.path;
-
-    // Simulate some realistic like counts for demo purposes if not set
-    // In a real app, this would come from the backend
-    int savedCount = prefs.getInt('likes_count_$path') ?? 0;
+    final String identifier = widget.imageFile?.path ?? widget.textContent ?? '';
 
     setState(() {
-      _isLiked = prefs.getBool('liked_$path') ?? false;
-      _likeCount = savedCount;
+      _isLiked = prefs.getBool('liked_$identifier') ?? false;
+      _likeCount = prefs.getInt('likes_count_$identifier') ?? (15 + (identifier.hashCode % 100));
       _isLoading = false;
     });
   }
 
   Future<void> _toggleLike() async {
     final prefs = await SharedPreferences.getInstance();
-    final String path = widget.imageFile.path;
+    final String identifier = widget.imageFile?.path ?? widget.textContent ?? '';
 
     setState(() {
       _isLiked = !_isLiked;
       _likeCount = _isLiked ? _likeCount + 1 : _likeCount - 1;
     });
 
-    await prefs.setBool('liked_$path', _isLiked);
-    await prefs.setInt('likes_count_$path', _likeCount);
+    await prefs.setBool('liked_$identifier', _isLiked);
+    await prefs.setInt('likes_count_$identifier', _likeCount);
   }
 
   Future<void> _deletePost(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
           'Delete Post',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -78,11 +78,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               style: GoogleFonts.poppins(color: Colors.grey),
             ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             child: Text(
               'Delete',
-              style: GoogleFonts.poppins(color: Colors.red),
+              style: GoogleFonts.poppins(color: Colors.white),
             ),
           ),
         ],
@@ -100,15 +104,27 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             await prefs.setStringList('user_posts_$userId', currentPosts);
 
             if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Post deleted successfully',
+                    style: GoogleFonts.poppins(),
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
               Navigator.pop(context, true); // Return true to indicate deletion
             }
           }
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error deleting post: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting post: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
     }
@@ -117,94 +133,193 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Post',
+          style: GoogleFonts.poppins(
+            color: Colors.black87,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white),
-            onPressed: () => _deletePost(context),
+          PopupMenuButton(
+            icon: const Icon(Icons.more_vert, color: Colors.black87),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                onTap: () => _deletePost(context),
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Delete',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Image
-          Center(
-            child: InteractiveViewer(
-              child: Image.file(widget.imageFile, fit: BoxFit.contain),
-            ),
-          ),
-
-          // Bottom Actions
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(20),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Main post content
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade100, width: 8),
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (widget.caption != null && widget.caption!.isNotEmpty) ...[
-                    Text(
-                      widget.caption!,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                  // User info (placeholder - in real app would come from user data)
                   Row(
                     children: [
-                      GestureDetector(
-                        onTap: _toggleLike,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.all(8),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _isLiked
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: _isLiked ? Colors.red : Colors.white,
-                                size: 32,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '$_likeCount',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: themeColor.withOpacity(0.1),
+                        child: Icon(Icons.person, color: themeColor, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'You',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: Colors.black87,
+                            ),
                           ),
-                        ),
+                          Text(
+                            '${DateTime.now().difference(DateTime.now().subtract(const Duration(hours: 2))).inHours}h',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Text content
+                  if ((widget.caption != null && widget.caption!.isNotEmpty) || 
+                      (widget.textContent != null && widget.textContent!.isNotEmpty)) ...[
+                    Text(
+                      widget.caption ?? widget.textContent ?? '',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: Colors.black87,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  
+                  // Image content
+                  if (widget.imageFile != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        widget.imageFile!,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
+                            color: Colors.grey.shade100,
+                            child: const Center(
+                              child: Icon(Icons.broken_image, color: Colors.grey),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  
+                  // Post stats
+                  if (_likeCount > 0)
+                    Text(
+                      '${_likeCount} likes',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
                 ],
               ),
             ),
-          ),
-        ],
+            
+            // Like action button
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade200, width: 0.5),
+                ),
+              ),
+              child: GestureDetector(
+                onTap: _toggleLike,
+                child: Row(
+                  children: [
+                    Icon(
+                      _isLiked ? Icons.favorite : Icons.favorite_border,
+                      color: _isLiked ? Colors.red : Colors.grey.shade600,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _isLiked ? 'Liked' : 'Like',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: _isLiked ? Colors.red : Colors.grey.shade600,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '$_likeCount',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: _isLiked ? Colors.red : Colors.grey.shade600,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          ],
+        ),
       ),
     );
   }
+
+
 }

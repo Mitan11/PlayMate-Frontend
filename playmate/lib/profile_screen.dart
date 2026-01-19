@@ -30,6 +30,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   List<Map<String, dynamic>> _availableSports = [];
   bool _isLoadingProfile = true;
   List<String> _userPosts = [];
+  Map<int, bool> _likedPosts = {};
+  Map<int, int> _postLikes = {};
 
   final Map<String, IconData> _sportIcons = {
     'Football': Icons.sports_soccer,
@@ -834,13 +836,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ),
                   Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [themeColor, themeColor.withOpacity(0.8)],
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
+                    child: TextButton.icon(
                       onPressed: () async {
                         final result = await Navigator.push(
                           context,
@@ -852,10 +848,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                           _loadUserPosts();
                         }
                       },
-                      icon: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 20,
+                      icon: Icon(
+                        Icons.add_circle_outline,
+                        size: 18,
+                        color: themeColor,
+                      ),
+                      label: Text(
+                        'Add New',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: themeColor,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     ),
                   ),
@@ -864,63 +872,15 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             const SizedBox(height: 12),
 
-            // Instagram-style Grid
-            GridView.builder(
+            // Twitter-style Timeline
+            ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 1,
-                mainAxisSpacing: 1,
-                childAspectRatio: 1,
-              ),
               itemCount: _userPosts.length,
+              separatorBuilder: (context, index) =>
+                  Divider(height: 1, color: Colors.grey.shade100),
               itemBuilder: (context, index) {
-                // Parse post data (handle plain path vs JSON)
-                String imagePath = _userPosts[index];
-                String? caption;
-
-                try {
-                  if (imagePath.trim().startsWith('{')) {
-                    final Map<String, dynamic> data = jsonDecode(imagePath);
-                    imagePath = data['path'] ?? '';
-                    caption = data['caption'];
-                  }
-                } catch (e) {
-                  // Fallback to treat as simple path
-                }
-
-                if (imagePath.isEmpty) return const SizedBox();
-
-                return GestureDetector(
-                  onTap: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PostDetailScreen(
-                          imageFile: File(imagePath),
-                          postIndex: index,
-                          caption: caption,
-                        ),
-                      ),
-                    );
-                    if (result == true && mounted) {
-                      _loadUserPosts();
-                    }
-                  },
-                  child: Container(
-                    color: Colors.grey[200],
-                    child: Image.file(
-                      File(imagePath),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(Icons.broken_image, color: Colors.grey),
-                        );
-                      },
-                    ),
-                  ),
-                );
+                return _buildTwitterPostItem(index);
               },
             ),
             const SizedBox(height: 40),
@@ -928,6 +888,307 @@ class _ProfileScreenState extends State<ProfileScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildTwitterPostItem(int index) {
+    String postItem = _userPosts[index];
+    String? imagePath;
+    String? caption;
+    String? textContent;
+    String timestamp = 'now';
+
+    try {
+      if (postItem.trim().startsWith('{')) {
+        final Map<String, dynamic> data = jsonDecode(postItem);
+        imagePath = data['path'];
+        caption = data['caption'];
+        textContent = data['caption'];
+
+        // Calculate time ago
+        if (data['timestamp'] != null) {
+          final postTime = DateTime.parse(data['timestamp']);
+          final difference = DateTime.now().difference(postTime);
+          if (difference.inDays > 0) {
+            timestamp = '${difference.inDays}d';
+          } else if (difference.inHours > 0) {
+            timestamp = '${difference.inHours}h';
+          } else if (difference.inMinutes > 0) {
+            timestamp = '${difference.inMinutes}m';
+          } else {
+            timestamp = 'now';
+          }
+        }
+      } else {
+        imagePath = postItem;
+      }
+    } catch (e) {
+      imagePath = postItem;
+    }
+
+    final bool hasImage = imagePath != null && imagePath.isNotEmpty;
+    final bool hasText = textContent != null && textContent.isNotEmpty;
+
+    return GestureDetector(
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PostDetailScreen(
+              imageFile: hasImage ? File(imagePath!) : null,
+              postIndex: index,
+              caption: caption,
+              textContent: textContent,
+            ),
+          ),
+        );
+        if (result == true && mounted) {
+          _loadUserPosts();
+        }
+      },
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: themeColor.withOpacity(0.1),
+              backgroundImage: _profileImage.isNotEmpty
+                  ? NetworkImage(_profileImage)
+                  : null,
+              child: _profileImage.isEmpty
+                  ? Icon(Icons.person, size: 20, color: themeColor)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+
+            // Post content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Text(
+                        '$_firstName $_lastName',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '·',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        timestamp,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const Spacer(),
+                      PopupMenuButton(
+                        icon: Icon(
+                          Icons.more_horiz,
+                          color: Colors.grey.shade500,
+                          size: 18,
+                        ),
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            onTap: () => _deletePostAtIndex(index),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: Colors.red,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Delete',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  // Text content
+                  if (hasText) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      textContent!,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        color: Colors.black87,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+
+                  // Image content
+                  if (hasImage) ...[
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(imagePath!),
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
+                            color: Colors.grey.shade100,
+                            child: Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+
+                  // Engagement section
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _toggleLike(index),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _likedPosts[index] == true
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 20,
+                              color: _likedPosts[index] == true
+                                  ? Colors.red
+                                  : Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${_postLikes[index] ?? (index * 3 + 5)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: _likedPosts[index] == true
+                                    ? Colors.red
+                                    : Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _toggleLike(int index) {
+    setState(() {
+      if (_likedPosts[index] == true) {
+        _likedPosts[index] = false;
+        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) - 1;
+      } else {
+        _likedPosts[index] = true;
+        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) + 1;
+      }
+    });
+  }
+
+  Future<void> _deletePostAtIndex(int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Delete Post',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Are you sure you want to delete this post?',
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final userId = prefs.getString('user_id');
+        if (userId != null) {
+          final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
+          if (index >= 0 && index < currentPosts.length) {
+            currentPosts.removeAt(index);
+            await prefs.setStringList('user_posts_$userId', currentPosts);
+            _loadUserPosts();
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Post deleted successfully',
+                  style: GoogleFonts.poppins(),
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting post: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildSportsSection() {
