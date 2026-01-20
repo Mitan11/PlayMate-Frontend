@@ -6,6 +6,7 @@ import Sidebar from "./components/Sidebar";
 import { Navigate, Route, Routes } from "react-router";
 import Dashboard from "./pages/Dashboard";
 import Box from "@mui/joy/Box";
+import Profile from "./pages/Profile";
 
 export default function App() {
     const { token } = useContext(AppContext);
@@ -43,6 +44,7 @@ export default function App() {
                         <Routes>
                             <Route path="/" element={<Navigate to="/dashboard" />} />
                             <Route path="/dashboard" element={<Dashboard />} />
+                            <Route path="/profile" element={<Profile />} />
                         </Routes>
                     </Box>
                 </Box>

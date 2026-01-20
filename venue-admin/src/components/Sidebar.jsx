@@ -42,7 +42,7 @@ function Sidebar() {
                                 to="/dashboard"
                                 icon={assets.home_icon}
                                 text={isMobile ? "" : "Dashboard"}
-                                isMobile={isMobile}
+                                centerIcon={isMobile}
                             />
                         </div>
                     </Tooltip>

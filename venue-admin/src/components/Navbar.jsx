@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { assets } from "../assets/assets";
 import { useContext } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 import { AppContext } from "../context/AppContextProvider";
@@ -14,7 +14,7 @@ import Avatar from "@mui/joy/Avatar";
 import Divider from "@mui/joy/Divider";
 
 function Navbar() {
-    const { token, setToken } = useContext(AppContext);
+    const { token, setToken, venueOwner } = useContext(AppContext);
     const navigate = useNavigate();
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -27,6 +27,7 @@ function Navbar() {
         if (token) {
             setToken("");
             localStorage.removeItem("token");
+            localStorage.removeItem("venue_owner");
             toast.success("Logout successful");
             setAnchorEl(null);
             navigate("/");
@@ -66,8 +67,8 @@ function Navbar() {
                     <motion.img
                         whileHover={{ scale: 1.05 }}
                         className="cursor-pointer"
-                        style={{ width: "auto", height: "35px", transition: "all 0.2s" }}
-                        src={assets.admin_logo}
+                        style={{ width: "auto", height: "40px", transition: "all 0.2s" }}
+                        src={assets.icon}
                         alt="Admin Logo"
                     />
                     <Box sx={{ display: { xs: "none", sm: "block" } }}>
@@ -83,8 +84,8 @@ function Navbar() {
                             }}
                         >
                             <p className="border px-2.5 py-0.5 text-xs rounded-full border-gray-500 text-gray-600">
-                    Venue Owner
-                </p>
+                                Venue Owner
+                            </p>
                         </Typography>
                     </Box>
                 </Box>
@@ -97,34 +98,38 @@ function Navbar() {
                         gap: { xs: 1, sm: 2 },
                     }}
                 >
-                    <Box
-                        sx={{
-                            display: { xs: "none", sm: "flex" },
-                            alignItems: "center",
-                            gap: 1,
-                            px: 2,
-                            py: 1,
-                            borderRadius: "12px",
-                            backgroundColor: "rgba(59, 130, 246, 0.05)",
-                        }}
-                    >
-                        <Avatar
-                            size="sm"
-                            variant="solid"
-                            color="primary"
-                            sx={{ fontSize: "0.875rem" }}
+
+                    <Link to="/profile" style={{ textDecoration: "none" }}>
+                        <Box
+                            sx={{
+                                display: { xs: "none", sm: "flex" },
+                                alignItems: "center",
+                                gap: 1,
+                                px: 2,
+                                py: 1,
+                                borderRadius: "12px",
+                                backgroundColor: "rgba(59, 130, 246, 0.05)",
+                            }}
                         >
-                            v
-                        </Avatar>
-                        <Box>
-                            <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                                Venue Owner Name
-                            </Typography>
-                            <Typography level="body-xs" sx={{ color: "neutral.400", fontSize: "0.75rem" }}>
-                                Venue Owner
-                            </Typography>
+                            <Avatar
+                                size="sm"
+                                variant="solid"
+                                color="primary"
+                                alt="Venue Owner Profile Image"
+                                src={venueOwner ? venueOwner.profile_image : ""}
+                                sx={{ fontSize: "0.875rem" }}
+                            />
+                            <Box>
+                                <Typography level="body-sm" sx={{ fontWeight: 600 }}>
+                                    {venueOwner ? `${venueOwner.first_name} ${venueOwner.last_name}` : "Venue Owner"}
+                                </Typography>
+                                <Typography level="body-xs" sx={{ color: "neutral.400", fontSize: "0.75rem" }}>
+                                    Venue Owner
+                                </Typography>
+                            </Box>
                         </Box>
-                    </Box>
+
+                    </Link>
 
                     <Divider orientation="vertical" sx={{ display: { xs: "none", sm: "block" }, height: "24px", opacity: 0.3 }} />
 

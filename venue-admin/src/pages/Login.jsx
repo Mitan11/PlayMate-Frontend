@@ -8,18 +8,16 @@ import { toast } from "react-hot-toast";
 
 export default function Login() {
     const navigate = useNavigate();
-    const [state, setState] = useState("Login");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const { backendUrl, token, setToken } = useContext(AppContext);
-
+    const { backendUrl, setToken, setVenueOwner } = useContext(AppContext);
     const [errors, setErrors] = useState({ email: "", password: "" });
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        document.title = `PlayMate | ${state}`;
-    }, [state]);
+        document.title = `PlayMate | Login`;
+    }, []);
 
     const validateForm = () => {
         let isValid = true;
@@ -58,7 +56,9 @@ export default function Login() {
             }
 
             setToken(token);
+            setVenueOwner(response.data.data);
             localStorage.setItem("token", token);
+            localStorage.setItem("venue_owner", JSON.stringify(response.data.data));
 
             navigate("/dashboard");
             toast.success("Login successful");

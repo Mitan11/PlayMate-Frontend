@@ -6,8 +6,11 @@ import Typography from "@mui/joy/Typography";
 import Button from "@mui/joy/Button";
 import LinearProgress from "@mui/joy/LinearProgress";
 import { useNavigate } from "react-router";
+import Preloader from "../components/Preloader";
 
 function Dashboard() {
+    const [loading, setLoading] = useState(false);
+
     const navigate = useNavigate();
     const [stats] = useState({
         totalSports: 12,
@@ -64,6 +67,12 @@ function Dashboard() {
         hidden: { opacity: 0, y: 10 },
         visible: { opacity: 1, y: 0 },
     };
+
+    if (loading) {
+        return (
+            <Preloader />
+        );
+    }
 
     return (
         <motion.div
