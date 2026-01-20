@@ -11,7 +11,8 @@ import 'dart:convert';
 import 'dart:io';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialIndex;
+  const HomeScreen({super.key, this.initialIndex = 0});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,7 +20,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final Color themeColor = const Color(0xFF2E7D32);
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
   String _userName = 'User';
   String _userEmail = '';
@@ -63,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.initialIndex;
     _loadUserData();
     _loadUserPosts();
   }
@@ -154,7 +156,11 @@ class _HomeScreenState extends State<HomeScreen> {
             case 0:
               return _buildHomeTab();
             case 1:
-              return const PlayScreen();
+              return PlayScreen(
+                initialFilter: widget.initialIndex == 1
+                    ? 'Created'
+                    : 'All Games',
+              );
             case 2:
               return const BookingScreen();
             case 3:
