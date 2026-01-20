@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import Box from "@mui/joy/Box";
 import Card from "@mui/joy/Card";
@@ -6,53 +6,82 @@ import Typography from "@mui/joy/Typography";
 import Button from "@mui/joy/Button";
 import LinearProgress from "@mui/joy/LinearProgress";
 import { useNavigate } from "react-router";
+import { AppContext } from '../context/AppContextProvider';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 import Preloader from "../components/Preloader";
 
 function Dashboard() {
-    const [loading, setLoading] = useState(false);
-
-    const navigate = useNavigate();
-    const [stats] = useState({
-        totalSports: 12,
-        activeSessions: 5,
-        totalUsers: 248,
-        revenue: "$12,500",
+    const { venueOwner, backendUrl, token } = useContext(AppContext);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        total_bookings: 0,
+        total_revenue: "0.00",
+        today_revenue: "0.00",
+        total_sports: 0
     });
 
-    const [recentActivities] = useState([
-        {
-            id: 1,
-            title: "Basketball Court Booked",
-            user: "John Doe",
-            time: "2 hours ago",
-        },
-        {
-            id: 2,
-            title: "New Sport Added - Pickleball",
-            user: "Admin",
-            time: "5 hours ago",
-        },
-        {
-            id: 3,
-            title: "Tennis Court Maintenance",
-            user: "Manager",
-            time: "1 day ago",
-        },
-        {
-            id: 4,
-            title: "Volleyball Event Scheduled",
-            user: "Sarah Smith",
-            time: "2 days ago",
-        },
-    ]);
+    const [recentBookings, setRecentBookings] = useState([]);
 
-    const [sportMetrics] = useState([
-        { name: "Basketball", users: 45, progress: 90 },
-        { name: "Football", users: 38, progress: 76 },
-        { name: "Tennis", users: 32, progress: 64 },
-        { name: "Volleyball", users: 28, progress: 56 },
-        { name: "Badminton", users: 25, progress: 50 },
-    ]);
+    const navigate = useNavigate();
+
+    // Fetch dashboard stats
+    const fetchDashboardStats = useCallback(async () => {
+        setLoading(true)
+        if (!venueOwner?.venue_id || !token) {
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const response = await axios.get(
+                `${backendUrl}/venue/dashboard/stats/${venueOwner.venue_id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+
+            if (response.data.status) {
+                setStats(response.data.data);
+            } else {
+                toast.error('Failed to fetch dashboard stats');
+            }
+
+            // Fetch recent bookings
+            try {
+                const bookingsResponse = await axios.get(
+                    `${backendUrl}/venue/analytics/recent-bookings/${venueOwner.venue_id}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+                if (bookingsResponse.data.status) {
+                    setRecentBookings(bookingsResponse.data.data || []);
+                }
+            } catch (bookingError) {
+                console.log('Recent bookings not available:', bookingError);
+            }
+        } catch (error) {
+            console.error('Dashboard stats error:', error);
+            toast.error('Error loading dashboard data');
+            if (error.response?.status === 401) {
+                navigate('/login');
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [venueOwner?.venue_id, token, backendUrl, navigate]);
+
+    useEffect(() => {
+        document.title = "PlayMate | Dashboard";
+        fetchDashboardStats();
+    }, [fetchDashboardStats]);
+
+
 
     const containerVariants = {
         hidden: { opacity: 0, y: 10 },
@@ -83,13 +112,37 @@ function Dashboard() {
         >
             <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, maxWidth: "100%", overflowX: "hidden" }}>
                 {/* Header Section */}
-                <Box sx={{ mb: 3 }}>
-                    <Typography level="h1" sx={{ mb: 0.5, fontSize: { xs: "1.5rem", sm: "1.875rem", md: "2.25rem" } }}>
-                        Welcome Back, Owner!
-                    </Typography>
-                    <Typography level="body-sm" sx={{ color: "neutral.500" }}>
-                        Here's an overview of your sports management platform
-                    </Typography>
+                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box>
+                        <Typography level="h1" sx={{ mb: 0.5, fontSize: { xs: "1.5rem", sm: "1.875rem", md: "2.25rem" } }}>
+                            Welcome Back, {venueOwner?.first_name || 'Owner'}!
+                        </Typography>
+                        <Typography level="body-sm" sx={{ color: "neutral.500" }}>
+                            Here's an overview of your venue performance
+                        </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button
+                            variant="solid"
+                            color="primary"
+                            onClick={() => navigate("/analytics")}
+                            sx={{ px: 3 }}
+                        >
+                            View Analytics
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            size="sm"
+                            loading={loading}
+                            onClick={fetchDashboardStats}
+                            sx={{
+                                minWidth: 'auto',
+                                px: 2
+                            }}
+                        >
+                            {loading ? 'Refreshing...' : 'Refresh'}
+                        </Button>
+                    </Box>
                 </Box>
 
                 {/* Stats Cards */}
@@ -108,27 +161,27 @@ function Dashboard() {
                     >
                         {[
                             {
-                                label: "Total Sports",
-                                value: stats.totalSports,
-                                icon: "⚽",
+                                label: "Total Bookings",
+                                value: stats.total_bookings,
+                                icon: "📅",
                                 color: "#3b82f6",
                             },
                             {
-                                label: "Active Sessions",
-                                value: stats.activeSessions,
-                                icon: "🎮",
+                                label: "Total Revenue",
+                                value: `₹${stats.total_revenue}`,
+                                icon: "💰",
                                 color: "#10b981",
                             },
                             {
-                                label: "Total Users",
-                                value: stats.totalUsers,
-                                icon: "👥",
+                                label: "Today's Revenue",
+                                value: `₹${stats.today_revenue}`,
+                                icon: "📊",
                                 color: "#8b5cf6",
                             },
                             {
-                                label: "Revenue",
-                                value: stats.revenue,
-                                icon: "💰",
+                                label: "Total Sports",
+                                value: stats.total_sports,
+                                icon: "⚽",
                                 color: "#f59e0b",
                             },
                         ].map((stat, index) => (
@@ -172,10 +225,18 @@ function Dashboard() {
                                     </Box>
                                     <LinearProgress
                                         determinate
-                                        value={Math.random() * 30 + 70}
+                                        value={
+                                            index === 0 ? Math.min((stats.total_bookings / 50) * 100, 100) : // Bookings progress
+                                                index === 1 ? Math.min((parseFloat(stats.total_revenue) / 1000) * 100, 100) : // Revenue progress
+                                                    index === 2 ? Math.min((parseFloat(stats.today_revenue) / 100) * 100, 100) : // Today's revenue progress
+                                                        Math.min((stats.total_sports / 10) * 100, 100) // Sports progress
+                                        }
                                         variant="solid"
                                         color="primary"
-                                        sx={{ height: 4 }}
+                                        sx={{
+                                            height: 4,
+                                            backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                                        }}
                                     />
                                 </Card>
                             </motion.div>
@@ -183,146 +244,108 @@ function Dashboard() {
                     </Box>
                 </motion.div>
 
-                {/* Main Content Grid */}
-                <Box
-                    sx={{
-                        display: "grid",
-                        gridTemplateColumns: {
-                            xs: "1fr",
-                            sm: "1fr",
-                            md: "2fr 1fr",
-                        },
-                        gap: { xs: 2, sm: 2, md: 3 },
-                    }}
-                >
-                    {/* Sports Metrics */}
-                    <motion.div variants={itemVariants}>
-                        <Card variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
-                            <Typography level="h3" sx={{ mb: 2, fontSize: { xs: "1.125rem", sm: "1.25rem" } }}>
-                                Sports Popularity
+                {/* Recent Bookings Section */}
+                <motion.div variants={itemVariants}>
+                    <Card variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                            <Typography level="h3" sx={{ fontSize: { xs: "1.125rem", sm: "1.25rem" }, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                📋 Recent Bookings
                             </Typography>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-                                {sportMetrics.map((sport, index) => (
-                                    <Box key={index}>
+                            <Button
+                                variant="outlined"
+                                size="sm"
+                                onClick={() => navigate("/bookings")}
+                            >
+                                View All
+                            </Button>
+                        </Box>
+
+                        {recentBookings.length > 0 ? (
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                {recentBookings.slice(0, 5).map((booking, index) => (
+                                    <motion.div key={booking.booking_id || index} variants={itemVariants}>
                                         <Box
                                             sx={{
                                                 display: "flex",
+                                                alignItems: "center",
                                                 justifyContent: "space-between",
-                                                mb: 0.75,
+                                                p: 2,
+                                                borderRadius: "8px",
+                                                border: "1px solid",
+                                                borderColor: "neutral.200",
+                                                backgroundColor: "background.surface",
+                                                transition: "all 0.2s",
+                                                "&:hover": {
+                                                    borderColor: "primary.300",
+                                                    backgroundColor: "primary.50",
+                                                    transform: "translateY(-1px)",
+                                                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                                                },
                                             }}
                                         >
-                                            <Typography level="body-sm" sx={{ fontWeight: "md" }}>
-                                                {sport.name}
-                                            </Typography>
-                                            <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                                                {sport.users} users
-                                            </Typography>
-                                        </Box>
-                                        <LinearProgress
-                                            determinate
-                                            value={sport.progress}
-                                            variant="solid"
-                                            sx={{ height: 6 }}
-                                        />
-                                    </Box>
-                                ))}
-                            </Box>
-                        </Card>
-                    </motion.div>
-
-                    {/* Quick Actions */}
-                    <motion.div variants={itemVariants}>
-                        <Card variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
-                            <Typography level="h3" sx={{ mb: 2, fontSize: { xs: "1.125rem", sm: "1.25rem" } }}>
-                                Quick Actions
-                            </Typography>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                                <Button
-                                    variant="solid"
-                                    color="primary"
-                                    onClick={() => navigate("/sports-management")}
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    ➕ Add New Sport
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    color="primary"
-                                    onClick={() => navigate("/sports-management")}
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    📊 Manage Sports
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    color="neutral"
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    📈 View Reports
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    color="neutral"
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    ⚙️ Settings
-                                </Button>
-                            </Box>
-                        </Card>
-                    </motion.div>
-                </Box>
-
-                {/* Recent Activities */}
-                <motion.div variants={itemVariants} style={{ marginTop: "24px" }}>
-                    <Card variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
-                        <Typography level="h3" sx={{ mb: 2, fontSize: { xs: "1.125rem", sm: "1.25rem" } }}>
-                            Recent Activities
-                        </Typography>
-                        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                            {recentActivities.map((activity) => (
-                                <motion.div key={activity.id} variants={itemVariants}>
-                                    <Box
-                                        sx={{
-                                            display: "flex",
-                                            alignItems: "flex-start",
-                                            gap: 2,
-                                            pb: 1.5,
-                                            borderBottom: "1px solid",
-                                            borderColor: "divider",
-                                            "&:last-child": {
-                                                borderBottom: "none",
-                                            },
-                                        }}
-                                    >
-                                        <Box
-                                            sx={{
-                                                width: 8,
-                                                height: 8,
-                                                borderRadius: "50%",
-                                                backgroundColor: "primary.main",
-                                                mt: 1,
-                                                flexShrink: 0,
-                                            }}
-                                        />
-                                        <Box sx={{ flex: 1 }}>
-                                            <Typography level="body-sm" sx={{ fontWeight: "md" }}>
-                                                {activity.title}
-                                            </Typography>
-                                            <Box sx={{ display: "flex", gap: 1, mt: 0.5 }}>
-                                                <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                                                    {activity.user}
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
+                                                <Box
+                                                    sx={{
+                                                        width: 40,
+                                                        height: 40,
+                                                        borderRadius: "50%",
+                                                        backgroundColor: "primary.100",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    <Typography sx={{ fontSize: "1.2rem" }}>🏆</Typography>
+                                                </Box>
+                                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                    <Typography level="body-sm" sx={{ fontWeight: 600, mb: 0.25 }}>
+                                                        {`${booking.first_name} ${booking.last_name}`}
+                                                    </Typography>
+                                                    <Typography level="body-xs" sx={{ color: "neutral.500", mb: 0.25 }}>
+                                                        {`${booking.start_time} - ${booking.end_time}`}
+                                                    </Typography>
+                                                    <Typography level="body-xs" sx={{ color: "neutral.400" }}>
+                                                        {new Date(booking.start_datetime).toLocaleDateString()}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                            <Box sx={{ textAlign: "right" }}>
+                                                <Typography
+                                                    level="body-sm"
+                                                    sx={{
+                                                        fontWeight: 600,
+                                                        color: 'success.600',
+                                                        fontSize: '0.875rem'
+                                                    }}
+                                                >
+                                                    ₹{booking.total_price}
                                                 </Typography>
                                                 <Typography level="body-xs" sx={{ color: "neutral.400" }}>
-                                                    • {activity.time}
+                                                    #{booking.booking_id}
                                                 </Typography>
                                             </Box>
                                         </Box>
-                                    </Box>
-                                </motion.div>
-                            ))}
-                        </Box>
+                                    </motion.div>
+                                ))}
+                            </Box>
+                        ) : (
+                            <Box sx={{ textAlign: "center", py: 4 }}>
+                                <Typography sx={{ fontSize: "3rem", mb: 1 }}>📋</Typography>
+                                <Typography level="h4" sx={{ mb: 1, color: "neutral.500" }}>
+                                    No Recent Bookings
+                                </Typography>
+                                <Typography level="body-sm" sx={{ color: "neutral.400" }}>
+                                    When customers book your venue, they'll appear here
+                                </Typography>
+                            </Box>
+                        )}
                     </Card>
                 </motion.div>
+
+
+
+
             </Box>
         </motion.div>
     );

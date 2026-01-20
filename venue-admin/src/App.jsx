@@ -7,6 +7,7 @@ import { Navigate, Route, Routes } from "react-router";
 import Dashboard from "./pages/Dashboard";
 import Box from "@mui/joy/Box";
 import Profile from "./pages/Profile";
+import VenueAnalytics from "./pages/VenueAnalytics";
 
 export default function App() {
     const { token } = useContext(AppContext);
@@ -45,6 +46,9 @@ export default function App() {
                             <Route path="/" element={<Navigate to="/dashboard" />} />
                             <Route path="/dashboard" element={<Dashboard />} />
                             <Route path="/profile" element={<Profile />} />
+                            <Route path="/analytics" element={<VenueAnalytics />} />
+                            {/* <Route path="/bookings" element={<VenueAnalytics />} /> */}
+                            <Route path="*" element={<Navigate to="/dashboard" />} />
                         </Routes>
                     </Box>
                 </Box>

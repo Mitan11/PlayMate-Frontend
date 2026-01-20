@@ -94,10 +94,19 @@ function Dashboard() {
                             Here's an overview of your sports management platform
                         </Typography>
                     </Box>
-                    <Button onClick={() => navigate("/admin/analytics")}>
-                        View Analytics
-                    </Button>
-
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                        <Button onClick={() => navigate("/admin/analytics")}>
+                            View Analytics
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            color="neutral"
+                            loading={loading}
+                            onClick={fetchDashboardData}
+                        >
+                            Refresh
+                        </Button>
+                    </Box>
                 </Box>
 
                 {/* Stats Cards */}
