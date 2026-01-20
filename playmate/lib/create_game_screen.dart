@@ -4,9 +4,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:playmate/payment_summary_screen.dart';
 
 class CreateGameScreen extends StatefulWidget {
-  const CreateGameScreen({super.key});
+  final String? initialArea;
+  final String? venueName;
+  final String? price;
+
+  const CreateGameScreen({
+    super.key,
+    this.initialArea,
+    this.venueName,
+    this.price,
+  });
 
   @override
   State<CreateGameScreen> createState() => _CreateGameScreenState();
@@ -25,7 +35,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   bool _isLoadingSports = false;
 
   // Controllers
-  final TextEditingController _areaController = TextEditingController();
+  late TextEditingController _areaController;
   final TextEditingController _playersController = TextEditingController();
 
   // Dummy Slots
@@ -34,6 +44,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   @override
   void initState() {
     super.initState();
+    _areaController = TextEditingController(text: widget.initialArea);
     _fetchSports();
   }
 
@@ -331,7 +342,47 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Handle Next Action
+                    if (_selectedSportId == null || _selectedSlot == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please select sport and slot'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final selectedSport = _sportsList.firstWhere(
+                      (s) => s['sport_id'].toString() == _selectedSportId,
+                      orElse: () => {'sport_name': 'Unknown'},
+                    );
+
+                    // Parse price
+                    double courtPrice = 500.0;
+                    if (widget.price != null) {
+                      // Remove commas first, then remove non-digits/dots
+                      final cleanString = widget.price!
+                          .replaceAll(',', '')
+                          .replaceAll(RegExp(r'[^0-9.]'), '');
+                      if (cleanString.isNotEmpty) {
+                        courtPrice = double.tryParse(cleanString) ?? 500.0;
+                      }
+                    }
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PaymentSummaryScreen(
+                          venueName: widget.venueName ?? 'Unknown Venue',
+                          sportName: selectedSport['sport_name'],
+                          date: _selectedDate.toIso8601String().split('T')[0],
+                          time: _selectedSlot!,
+                          courtPrice: courtPrice,
+                          totalPlayers: _playersController.text.isNotEmpty
+                              ? _playersController.text
+                              : '4',
+                        ),
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: themeColor, // Use App Theme Color
