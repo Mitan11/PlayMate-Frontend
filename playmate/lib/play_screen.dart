@@ -3,10 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:playmate/create_game_screen.dart';
+import 'package:playmate/venue_selection_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:playmate/manage_game_screen.dart';
 
 class PlayScreen extends StatefulWidget {
-  const PlayScreen({super.key});
+  final String initialFilter;
+  const PlayScreen({super.key, this.initialFilter = 'All Games'});
 
   @override
   State<PlayScreen> createState() => _PlayScreenState();
@@ -14,7 +17,7 @@ class PlayScreen extends StatefulWidget {
 
 class _PlayScreenState extends State<PlayScreen> {
   final Color themeColor = const Color(0xFF2E7D32);
-  String _selectedFilter = 'All Games'; // Options: All Games, Joined, Created
+  late String _selectedFilter; // Options: All Games, Joined, Created
   List<Map<String, dynamic>> _sportsFilters = [];
   String _selectedSportFilter = 'All';
   bool _isLoadingSports = false;
@@ -22,7 +25,28 @@ class _PlayScreenState extends State<PlayScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedFilter = widget.initialFilter;
     _fetchAllSports();
+    _loadCreatedGames(); // Load saved games
+  }
+
+  Future<void> _loadCreatedGames() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? createdGamesString = prefs.getString('created_games');
+    if (createdGamesString != null) {
+      try {
+        final List<dynamic> loadedGames = jsonDecode(createdGamesString);
+        setState(() {
+          // Filter out existing created games to avoid duplicates if re-loading
+          _allPlayItems.removeWhere((item) => item['isCreated'] == true);
+
+          // Add loaded games
+          _allPlayItems.addAll(loadedGames.cast<Map<String, dynamic>>());
+        });
+      } catch (e) {
+        debugPrint('Error loading created games: $e');
+      }
+    }
   }
 
   Future<void> _fetchAllSports() async {
@@ -56,7 +80,7 @@ class _PlayScreenState extends State<PlayScreen> {
     }
   }
 
-  final List<Map<String, dynamic>> _allPlayItems = [
+  List<Map<String, dynamic>> _allPlayItems = [
     {
       'sport': 'Tennis',
       'image': 'assets/images/tennis_court.jpg',
@@ -187,7 +211,7 @@ class _PlayScreenState extends State<PlayScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const CreateGameScreen(),
+                    builder: (context) => const VenueSelectionScreen(),
                   ),
                 );
               },
@@ -222,6 +246,7 @@ class _PlayScreenState extends State<PlayScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 await _fetchAllSports();
+                await _loadCreatedGames(); // Reload games on refresh
                 // Simulate data reload for matches
                 await Future.delayed(const Duration(milliseconds: 500));
                 setState(() {}); // Refresh UI
@@ -447,7 +472,17 @@ class _PlayScreenState extends State<PlayScreen> {
                                         ),
                                         if (item['isCreated'] == true)
                                           OutlinedButton(
-                                            onPressed: () {},
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      ManageGameScreen(
+                                                        gameData: item,
+                                                      ),
+                                                ),
+                                              );
+                                            },
                                             style: OutlinedButton.styleFrom(
                                               foregroundColor: themeColor,
                                               side: BorderSide(
