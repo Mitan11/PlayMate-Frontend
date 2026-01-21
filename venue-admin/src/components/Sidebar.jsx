@@ -56,7 +56,16 @@ function Sidebar() {
                             />
                         </div>
                     </Tooltip>
-                    
+                    <Tooltip title="Bookings" placement="right" disableHoverListener={!isMobile}>
+                        <div>
+                            <NavItem
+                                to="/bookings"
+                                icon={assets.bookings_icon}
+                                text={isMobile ? "" : "Bookings"}
+                                centerIcon={isMobile}
+                            />
+                        </div>
+                    </Tooltip>
                 </ul>
                 
             </Box>
