@@ -46,7 +46,19 @@ function Sidebar() {
                             />
                         </div>
                     </Tooltip>
+                    <Tooltip title="Venue Sports" placement="right" disableHoverListener={!isMobile}>
+                        <div>
+                            <NavItem
+                                to="/venue-sports"
+                                icon={assets.sports_icon}
+                                text={isMobile ? "" : "Venue Sports"}
+                                centerIcon={isMobile}
+                            />
+                        </div>
+                    </Tooltip>
+                    
                 </ul>
+                
             </Box>
         </motion.aside>
     );
