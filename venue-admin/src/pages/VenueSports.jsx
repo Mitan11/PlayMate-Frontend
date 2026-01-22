@@ -5,6 +5,7 @@ import { Box, Button, Typography, Select, Option, FormControl, FormLabel, FormHe
 import { AppContext } from '../context/AppContextProvider';
 import axios from 'axios';
 import Modalbox from '../components/Modalbox';
+import toast from 'react-hot-toast';
 
 function VenueSports() {
     const { venue_id } = useParams();
@@ -50,6 +51,12 @@ function VenueSports() {
 
     // Define table columns
     const columns = useMemo(() => [
+        {
+            key: 'no',
+            label: 'No.',
+            width: 70,
+            render: (_, __, index) => index
+        },
         {
             key: 'venue_sport_id',
             label: 'Venue Sport ID',
@@ -134,6 +141,7 @@ function VenueSports() {
                 setSportToEdit(null);
                 setSelectedSportId('');
                 setFormError('');
+                toast.success('Sport updated successfully');
             } else {
                 setFormError(response.data.message || 'Failed to update sport');
                 setTimeout(() => setEditModalOpen(true), 0);
@@ -171,6 +179,7 @@ function VenueSports() {
                 setDeleteModalOpen(false);
                 setSportToDelete(null);
                 setFormError('');
+                toast.success('Sport deleted successfully');
             } else {
                 setFormError(response.data.message || 'Failed to delete sport');
                 setTimeout(() => setDeleteModalOpen(true), 0);
@@ -221,6 +230,7 @@ function VenueSports() {
                 setModalOpen(false);
                 setSelectedSportId('');
                 setFormError('');
+                toast.success('Sport added successfully');
             } else {
                 setFormError(response.data.message || 'Failed to add sport');
                 // Keep modal open on error
@@ -300,8 +310,8 @@ function VenueSports() {
                 searchable={true}
                 searchPlaceholder="Search sports..."
                 pageSize={7}
-                firstColumnWidth={140}
-                lastColumnWidth={160}
+                firstColumnWidth={70}
+                lastColumnWidth={100}
             />
 
             {/* Add Sport Modal */}

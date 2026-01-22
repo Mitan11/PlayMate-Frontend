@@ -255,35 +255,39 @@ function DataTable({
                                 </td>
                             </tr>
                         ) : (
-                            paginatedRows.map((row, index) => (
-                                <tr key={row.id ?? index}>
-                                    {columns.map((col) => (
-                                        <td key={col.key}>
-                                            {col.render
-                                                ? col.render(row[col.key], row)
-                                                : row[col.key]}
-                                        </td>
-                                    ))}
+                            paginatedRows.map((row, index) => {
+                                const absoluteIndex = ((page - 1) * pageSize) + index + 1;
 
-                                    {actions.length > 0 && (
-                                        <td>
-                                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                                {actions.map((action) => (
-                                                    <Button
-                                                        key={action.label}
-                                                        size="sm"
-                                                        variant={action.variant ?? 'plain'}
-                                                        color={action.color ?? 'neutral'}
-                                                        onClick={() => action.onClick(row)}
-                                                    >
-                                                        {action.label}
-                                                    </Button>
-                                                ))}
-                                            </Box>
-                                        </td>
-                                    )}
-                                </tr>
-                            ))
+                                return (
+                                    <tr key={row.id ?? index}>
+                                        {columns.map((col) => (
+                                            <td key={col.key}>
+                                                {col.render
+                                                    ? col.render(row[col.key], row, absoluteIndex)
+                                                    : row[col.key]}
+                                            </td>
+                                        ))}
+
+                                        {actions.length > 0 && (
+                                            <td style={{ width: 'var(--Table-lastColumnWidth)' }}>
+                                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                                    {actions.map((action) => (
+                                                        <Button
+                                                            key={action.label}
+                                                            size="sm"
+                                                            variant={action.variant ?? 'plain'}
+                                                            color={action.color ?? 'neutral'}
+                                                            onClick={() => action.onClick(row)}
+                                                        >
+                                                            {action.label}
+                                                        </Button>
+                                                    ))}
+                                                </Box>
+                                            </td>
+                                        )}
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </Table>
