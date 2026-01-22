@@ -32,6 +32,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   // Data
   List<Map<String, dynamic>> _sportsList = [];
   String? _selectedSportId;
+  // ignore: unused_field
   bool _isLoadingSports = false;
 
   // Controllers

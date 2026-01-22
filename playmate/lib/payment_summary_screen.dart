@@ -43,22 +43,12 @@ class PaymentSummaryScreen extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
+                    
                     child: IconButton(
                       icon: const Icon(
                         Icons.arrow_back,
                         color: Colors.black87,
-                        size: 20,
+                        size: 25,
                       ),
                       onPressed: () => Navigator.pop(context),
                     ),

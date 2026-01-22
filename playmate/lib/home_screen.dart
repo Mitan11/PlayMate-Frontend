@@ -4,11 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:playmate/login_screen.dart';
 import 'package:playmate/profile_screen.dart';
 import 'package:playmate/create_post_screen.dart';
-import 'package:playmate/post_detail_screen.dart';
 import 'package:playmate/play_screen.dart';
 import 'package:playmate/booking_screen.dart';
-import 'dart:convert';
-import 'dart:io';
 
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
@@ -25,9 +22,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userName = 'User';
   String _userEmail = '';
   String _profileImage = '';
-  List<String> _userPosts = [];
-  Map<int, bool> _likedPosts = {};
-  Map<int, int> _postLikes = {};
 
   final List<Map<String, dynamic>> _dummyPosts = [
     {
@@ -162,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     : 'All Games',
               );
             case 2:
-              return const BookingScreen();
+              return const VenueSelectionScreen();
             case 3:
               return const ProfileScreen();
             default:
@@ -340,91 +334,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final userId = prefs.getString('user_id');
     if (userId != null) {
       setState(() {
-        _userPosts = prefs.getStringList('user_posts_$userId') ?? [];
+        // Posts loaded
       });
-    }
-  }
-
-  void _toggleLike(int index) {
-    setState(() {
-      if (_likedPosts[index] == true) {
-        _likedPosts[index] = false;
-        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) - 1;
-      } else {
-        _likedPosts[index] = true;
-        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) + 1;
-      }
-    });
-  }
-
-  Future<void> _deletePostAtIndex(int index) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Delete Post',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: Text(
-          'Are you sure you want to delete this post?',
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Delete',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final userId = prefs.getString('user_id');
-        if (userId != null) {
-          final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
-          if (index >= 0 && index < currentPosts.length) {
-            currentPosts.removeAt(index);
-            await prefs.setStringList('user_posts_$userId', currentPosts);
-            _loadUserPosts();
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Post deleted successfully',
-                  style: GoogleFonts.poppins(),
-                ),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting post: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 

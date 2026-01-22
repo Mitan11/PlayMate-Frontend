@@ -37,8 +37,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   String? _firstNameError;
   String? _lastNameError;
-  String? _pickedImagePath;
+
   File? _croppedImageFile;
+  // ignore: unused_field
+  String? _pickedImagePath;
 
   @override
   void initState() {
@@ -164,7 +166,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final base = dotenv.env['BASE_URL'] ?? '';
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    final userId = prefs.getString('user_id');
 
     final uri = Uri.parse('$base/user/updateDetails');
 
@@ -304,10 +305,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       await file.writeAsBytes(jpgBytes);
 
                       setState(() {
-                        _croppedImageFile = file; 
-                        _profileImageBytes = Uint8List.fromList(
-                          jpgBytes,
-                        ); 
+                        _croppedImageFile = file;
+                        _profileImageBytes = Uint8List.fromList(jpgBytes);
                         _isCropping = false;
                       });
                     },

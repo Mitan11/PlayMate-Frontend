@@ -1033,7 +1033,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   if (hasText) ...[
                     const SizedBox(height: 4),
                     Text(
-                      textContent!,
+                      textContent,
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         color: Colors.black87,
@@ -1048,7 +1048,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.file(
-                        File(imagePath!),
+                        File(imagePath),
                         width: double.infinity,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
