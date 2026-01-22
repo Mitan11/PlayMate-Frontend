@@ -24,6 +24,7 @@ class PostDetailScreen extends StatefulWidget {
 class _PostDetailScreenState extends State<PostDetailScreen> {
   bool _isLiked = false;
   int _likeCount = 0;
+  // ignore: unused_field
   bool _isLoading = true;
   final Color themeColor = const Color(0xFF2E7D32);
 
@@ -35,18 +36,22 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   Future<void> _loadPostData() async {
     final prefs = await SharedPreferences.getInstance();
-    final String identifier = widget.imageFile?.path ?? widget.textContent ?? '';
+    final String identifier =
+        widget.imageFile?.path ?? widget.textContent ?? '';
 
     setState(() {
       _isLiked = prefs.getBool('liked_$identifier') ?? false;
-      _likeCount = prefs.getInt('likes_count_$identifier') ?? (15 + (identifier.hashCode % 100));
+      _likeCount =
+          prefs.getInt('likes_count_$identifier') ??
+          (15 + (identifier.hashCode % 100));
       _isLoading = false;
     });
   }
 
   Future<void> _toggleLike() async {
     final prefs = await SharedPreferences.getInstance();
-    final String identifier = widget.imageFile?.path ?? widget.textContent ?? '';
+    final String identifier =
+        widget.imageFile?.path ?? widget.textContent ?? '';
 
     setState(() {
       _isLiked = !_isLiked;
@@ -82,7 +87,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: Text(
               'Delete',
@@ -157,7 +164,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 onTap: () => _deletePost(context),
                 child: Row(
                   children: [
-                    const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    const Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: Colors.red,
+                    ),
                     const SizedBox(width: 12),
                     Text(
                       'Delete',
@@ -170,7 +181,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ),
               ),
             ],
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ],
       ),
@@ -222,12 +235,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 12),
-                  
+
                   // Text content
-                  if ((widget.caption != null && widget.caption!.isNotEmpty) || 
-                      (widget.textContent != null && widget.textContent!.isNotEmpty)) ...[
+                  if ((widget.caption != null && widget.caption!.isNotEmpty) ||
+                      (widget.textContent != null &&
+                          widget.textContent!.isNotEmpty)) ...[
                     Text(
                       widget.caption ?? widget.textContent ?? '',
                       style: GoogleFonts.poppins(
@@ -238,7 +252,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  
+
                   // Image content
                   if (widget.imageFile != null) ...[
                     ClipRRect(
@@ -252,7 +266,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             height: 200,
                             color: Colors.grey.shade100,
                             child: const Center(
-                              child: Icon(Icons.broken_image, color: Colors.grey),
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Colors.grey,
+                              ),
                             ),
                           );
                         },
@@ -260,7 +277,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  
+
                   // Post stats
                   if (_likeCount > 0)
                     Text(
@@ -273,7 +290,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ],
               ),
             ),
-            
+
             // Like action button
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -314,12 +331,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ),
               ),
             ),
-
           ],
         ),
       ),
     );
   }
-
-
 }

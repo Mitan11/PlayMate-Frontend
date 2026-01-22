@@ -20,6 +20,7 @@ class _PlayScreenState extends State<PlayScreen> {
   late String _selectedFilter; // Options: All Games, Joined, Created
   List<Map<String, dynamic>> _sportsFilters = [];
   String _selectedSportFilter = 'All';
+  // ignore: unused_field
   bool _isLoadingSports = false;
 
   @override

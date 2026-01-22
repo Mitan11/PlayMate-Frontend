@@ -1,191 +1,232 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:playmate/create_game_screen.dart';
 
-class BookingScreen extends StatefulWidget {
-  const BookingScreen({super.key});
+class VenueSelectionScreen extends StatefulWidget {
+  const VenueSelectionScreen({super.key});
 
   @override
-  State<BookingScreen> createState() => _BookingScreenState();
+  State<VenueSelectionScreen> createState() => _VenueSelectionScreenState();
 }
 
-class _BookingScreenState extends State<BookingScreen> {
-  final Color themeColor = const Color(0xFF2E7D32);
-
-  final List<Map<String, dynamic>> bookingItems = [
+class _VenueSelectionScreenState extends State<VenueSelectionScreen> {
+  final List<Map<String, dynamic>> _turfs = [
     {
-      'sport': 'Badminton',
-      'date': 'Tomorrow, 20 Jan',
-      'time': '06:00 PM - 07:00 PM',
-      'venue': 'Smash Arena',
-      'status': 'Confirmed',
-      'court': 'Court 3',
+      'name': 'Blackk and One Sports Foundation',
+      'address':
+          'Tulip Bunglow Road Nr. Enigma Towers,\nThaltej, Ahmedabad, Gujarat 380054',
+      'offer': 'Upto 10% Off',
+      'price': 'INR 300 Onwards',
+      'image': '', // Placeholder
     },
     {
-      'sport': 'Tennis',
-      'date': 'Sat, 24 Jan',
-      'time': '07:00 AM - 08:30 AM',
-      'venue': 'Green Valley Club',
-      'status': 'Pending',
-      'court': 'Clay Court 1',
+      'name': 'CRIC24 - The Box Cricket',
+      'address':
+          'nr. Amaze Driving RTO Practice Track,\nGhuma, Ahmedabad, Gujarat 380058',
+      'offer': 'Upto 5% Off',
+      'price': 'INR 500 Onwards',
+      'image': '',
+    },
+    {
+      'name': 'Pickle Pro',
+      'address': 'YMCA, Makarba, Ahmedabad, Gujarat 382210',
+      'offer': 'Upto 10% Off',
+      'price': 'INR 700 Onwards',
+      'image': '',
     },
   ];
+
+  final Color themeColor = const Color(0xFF2E7D32);
+  String _searchQuery = '';
+
+  List<Map<String, dynamic>> get _filteredTurfs {
+    if (_searchQuery.isEmpty) {
+      return _turfs;
+    }
+    return _turfs.where((turf) {
+      final name = turf['name'].toString().toLowerCase();
+      final address = turf['address'].toString().toLowerCase();
+      final query = _searchQuery.toLowerCase();
+      return name.contains(query) || address.contains(query);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F8F3),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          // Simulate data reload
-          await Future.delayed(const Duration(milliseconds: 500));
-          setState(() {}); // Refresh UI
-        },
-        color: themeColor,
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: bookingItems.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
-          itemBuilder: (context, index) {
-            final item = bookingItems[index];
-            final bool isConfirmed = item['status'] == 'Confirmed';
-
-            return Container(
-              padding: const EdgeInsets.all(20),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF3F8F3), // Match scaffold bg
+        elevation: 0,
+        title: Text(
+          'Select Venue',
+          style: GoogleFonts.poppins(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: const [],
+      ),
+      body: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              height: 50,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search, color: Colors.grey.shade400),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search',
+                        hintStyle: GoogleFonts.poppins(
+                          color: Colors.grey.shade400,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        border: InputBorder.none,
+                      ),
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
                   ),
                 ],
-                border: Border(
-                  left: BorderSide(
-                    color: isConfirmed ? Colors.green : Colors.orange,
-                    width: 4,
-                  ),
-                ),
               ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        item['sport'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
+            ),
+          ),
+
+          // Turf List
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: _filteredTurfs.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                final turf = _filteredTurfs[index];
+                return GestureDetector(
+                  onTap: () {
+                    // Navigate to CreateGameScreen when a turf is selected
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreateGameScreen(
+                          initialArea: turf['address'],
+                          venueName: turf['name'],
+                          price: turf['price'],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                        decoration: BoxDecoration(
-                          color: isConfirmed
-                              ? Colors.green.withOpacity(0.1)
-                              : Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          item['status'],
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isConfirmed ? Colors.green : Colors.orange,
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Image Placeholder
+                        Container(
+                          height: 140,
+                          color: Colors.grey.shade200,
+                          child: Center(
+                            child: Icon(
+                              Icons.stadium_outlined,
+                              size: 48,
+                              color: Colors.grey.shade400,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 16,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        item['date'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.black87,
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                turf['name'],
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.location_on_outlined,
+                                    size: 14,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      turf['address'],
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              const Divider(
+                                height: 1,
+                                color: Color(0xFFEEEEEE),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    turf['price'],
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        item['time'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 16,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        item['venue'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Divider(height: 1, color: Colors.grey.shade200),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        item['court'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      Text(
-                        'View Ticket',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: themeColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
