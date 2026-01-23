@@ -55,7 +55,7 @@ function VenueSports() {
             key: 'no',
             label: 'No.',
             width: 70,
-            render: (_, __, index) => index
+            render: (_, __, index) => index + 1
         },
         {
             key: 'venue_sport_id',
@@ -114,7 +114,7 @@ function VenueSports() {
 
     const confirmEdit = useCallback(async () => {
         setFormError('');
-        
+
         if (!selectedSportId) {
             setFormError('Please select a sport');
             setTimeout(() => setEditModalOpen(true), 0);

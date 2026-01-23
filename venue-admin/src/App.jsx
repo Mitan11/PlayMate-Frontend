@@ -10,6 +10,7 @@ import Profile from "./pages/Profile";
 import VenueAnalytics from "./pages/VenueAnalytics";
 import VenueSports from "./pages/VenueSports";
 import BookingsManagement from "./pages/BookingsManagement";
+import SlotsManagement from "./pages/SlotsManagement";
 
 export default function App() {
     const { token } = useContext(AppContext);
@@ -51,6 +52,7 @@ export default function App() {
                             <Route path="/analytics" element={<VenueAnalytics />} />
                             <Route path="/venue-sports" element={<VenueSports />} />
                             <Route path="/bookings" element={<BookingsManagement />} />
+                            <Route path="/slots" element={<SlotsManagement />} />
                             <Route path="*" element={<Navigate to="/dashboard" />} />
                         </Routes>
                     </Box>

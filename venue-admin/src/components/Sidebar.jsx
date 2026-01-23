@@ -66,8 +66,18 @@ function Sidebar() {
                             />
                         </div>
                     </Tooltip>
+                    <Tooltip title="Slots Management" placement="right" disableHoverListener={!isMobile}>
+                        <div>
+                            <NavItem
+                                to="/slots"
+                                icon={assets.slots_icon}
+                                text={isMobile ? "" : "Slots Management"}
+                                centerIcon={isMobile}
+                            />
+                        </div>
+                    </Tooltip>
                 </ul>
-                
+
             </Box>
         </motion.aside>
     );

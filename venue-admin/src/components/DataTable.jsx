@@ -256,14 +256,14 @@ function DataTable({
                             </tr>
                         ) : (
                             paginatedRows.map((row, index) => {
-                                const absoluteIndex = ((page - 1) * pageSize) + index + 1;
+                                const absoluteIndexZeroBased = ((page - 1) * pageSize) + index;
 
                                 return (
                                     <tr key={row.id ?? index}>
                                         {columns.map((col) => (
                                             <td key={col.key}>
                                                 {col.render
-                                                    ? col.render(row[col.key], row, absoluteIndex)
+                                                    ? col.render(row[col.key], row, absoluteIndexZeroBased)
                                                     : row[col.key]}
                                             </td>
                                         ))}
