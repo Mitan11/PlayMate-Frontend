@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 
 function VenueSports() {
     const { venue_id } = useParams();
-    const { backendUrl, token, venueOwner } = useContext(AppContext);
+    const { backendUrl, token, venueOwner, getVenueSpots } = useContext(AppContext);
     const [sports, setSports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
@@ -23,30 +23,10 @@ function VenueSports() {
     const [sportToEdit, setSportToEdit] = useState(null);
 
     // Fetch sports data for the venue
-    const fetchVenueSports = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response = await axios.get(
-                `${backendUrl}/venue/sports/${venueOwner.venue_id}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
-            );
-
-            if (response.data.status && response.data.data) {
-                setSports(response.data.data);
-            }
-            setLoading(false);
-        } catch (error) {
-            console.error('Error fetching venue sports:', error);
-            setLoading(false);
-        }
-    }, [backendUrl, venue_id, token]);
+    const fetchVenueSports = useCallback((setSports, setLoading)=>{getVenueSpots(setSports, setLoading)}, [backendUrl, venue_id, token]);
 
     useEffect(() => {
-        fetchVenueSports();
+        fetchVenueSports(setSports, setLoading);
     }, [fetchVenueSports]);
 
     // Define table columns

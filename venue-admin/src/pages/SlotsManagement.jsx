@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import DataTable from '../components/DataTable';
-import { Box, Button, Typography, Chip, Input, FormControl, FormLabel } from '@mui/joy';
+import { Box, Button, Typography, Chip, Input, FormControl, FormLabel, Select, Option } from '@mui/joy';
 import { AppContext } from '../context/AppContextProvider';
 import axios from 'axios';
 import Modalbox from '../components/Modalbox';
@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 
 function SlotsManagement() {
     const { venue_id } = useParams();
-    const { backendUrl, token, venueOwner } = useContext(AppContext);
+    const { backendUrl, token, venueOwner, getVenueSpots } = useContext(AppContext);
     const [slots, setSlots] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -25,6 +25,14 @@ function SlotsManagement() {
         price_per_slot: ''
     });
     const [submitting, setSubmitting] = useState(false);
+    const [sports, setSports] = useState([]);
+
+    // Fetch sports data for the venue
+    const fetchVenueSports = useCallback((setSports, setLoading) => { getVenueSpots(setSports, setLoading) }, [backendUrl, venue_id, token]);
+
+    useEffect(() => {
+        fetchVenueSports(setSports, setLoading);
+    }, [fetchVenueSports]);
 
     // Fetch venue slots data
     const fetchVenueSlots = useCallback(async () => {
@@ -69,7 +77,7 @@ function SlotsManagement() {
         if (!slot) return;
         setEditingSlot(slot);
         setForm({
-            sport_id: slot.sport_id ?? '',
+            venue_sport_id: slot.venue_sport_id ?? '',
             start_time: slot.start_time ?? '',
             end_time: slot.end_time ?? '',
             price_per_slot: String(slot.price_per_slot ?? '')
@@ -78,7 +86,7 @@ function SlotsManagement() {
     }, []);
 
     const validateForm = useCallback(() => {
-        if (!form.sport_id || !form.start_time || !form.end_time || !form.price_per_slot) {
+        if (!form.venue_sport_id || !form.start_time || !form.end_time || !form.price_per_slot) {
             toast.error('Please fill all fields');
             return false;
         }
@@ -95,8 +103,7 @@ function SlotsManagement() {
         setSubmitting(true);
         try {
             const payload = {
-                venue_id: venueOwner.venue_id,
-                sport_id: Number(form.sport_id),
+                venue_sport_id: Number(form.venue_sport_id),
                 start_time: form.start_time,
                 end_time: form.end_time,
                 price_per_slot: Number(form.price_per_slot)
@@ -130,7 +137,7 @@ function SlotsManagement() {
         setSubmitting(true);
         try {
             const payload = {
-                sport_id: Number(form.sport_id),
+                venue_sport_id: Number(form.venue_sport_id),
                 start_time: form.start_time,
                 end_time: form.end_time,
                 price_per_slot: Number(form.price_per_slot)
@@ -365,13 +372,18 @@ function SlotsManagement() {
             >
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
                     <FormControl>
-                        <FormLabel>Sport ID</FormLabel>
-                        <Input
-                            type="number"
-                            value={form.sport_id}
-                            onChange={(e) => setForm((f) => ({ ...f, sport_id: e.target.value }))}
-                            placeholder="e.g., 1"
-                        />
+                        <FormLabel>Sport</FormLabel>
+                        <Select
+                            placeholder="Choose a sport"
+                            value={form.venue_sport_id}
+                            onChange={(e, newValue) => setForm((f) => ({ ...f, venue_sport_id: newValue }))}
+                        >
+                            {sports.map((sport) => (
+                                <Option key={sport.venue_sport_id} value={sport.venue_sport_id}>
+                                    {sport.sport_name}
+                                </Option>
+                            ))}
+                        </Select>
                     </FormControl>
                     <FormControl>
                         <FormLabel>Price per Slot (₹)</FormLabel>
@@ -419,12 +431,18 @@ function SlotsManagement() {
             >
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
                     <FormControl>
-                        <FormLabel>Sport ID</FormLabel>
-                        <Input
-                            type="number"
-                            value={form.sport_id}
-                            onChange={(e) => setForm((f) => ({ ...f, sport_id: e.target.value }))}
-                        />
+                        <FormLabel>Sport</FormLabel>
+                        <Select
+                            placeholder="Choose a sport"
+                            value={form.venue_sport_id}
+                            onChange={(e, newValue) => setForm((f) => ({ ...f, venue_sport_id: newValue }))}
+                        >
+                            {sports.map((sport) => (
+                                <Option key={sport.venue_sport_id} value={sport.venue_sport_id}>
+                                    {sport.sport_name}
+                                </Option>
+                            ))}
+                        </Select>
                     </FormControl>
                     <FormControl>
                         <FormLabel>Price per Slot (₹)</FormLabel>
