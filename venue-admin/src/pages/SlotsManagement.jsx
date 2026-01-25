@@ -50,7 +50,6 @@ function SlotsManagement() {
             if (response.data.status && response.data.data) {
                 setSlots(response.data.data);
             }
-            console.log("Slots Data:", response);
 
             setLoading(false);
         } catch (error) {
@@ -309,7 +308,7 @@ function SlotsManagement() {
                         onClick={handleOpenCreate}
                         sx={{ minWidth: 'auto', px: 2 }}
                     >
-                        Add Slot
+                        + Add Slot
                     </Button>
                     <Button
                         variant="outlined"

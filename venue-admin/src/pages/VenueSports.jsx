@@ -22,11 +22,13 @@ function VenueSports() {
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [sportToEdit, setSportToEdit] = useState(null);
 
-    // Fetch sports data for the venue
-    const fetchVenueSports = useCallback((setSports, setLoading)=>{getVenueSpots(setSports, setLoading)}, [backendUrl, venue_id, token]);
+    // Fetch sports data for the venue (hooks the state setters from this component)
+    const fetchVenueSports = useCallback(() => {
+        getVenueSpots(setSports, setLoading);
+    }, [getVenueSpots]);
 
     useEffect(() => {
-        fetchVenueSports(setSports, setLoading);
+        fetchVenueSports();
     }, [fetchVenueSports]);
 
     // Define table columns
