@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect, useMemo, useCallback, useRef } 
 import { AppContext } from '../context/AppContextProvider';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
+import { FiImage } from 'react-icons/fi';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import {
@@ -264,21 +265,38 @@ function Profile() {
                         </Box>
                         
                         {!editMode && (
-                            <Button 
-                                variant="solid"
-                                color="primary"
-                                startDecorator={<FaEdit />}
-                                onClick={() => setEditMode(true)}
-                                sx={{
-                                    borderRadius: '8px',
-                                    px: 3,
-                                    py: 1.5,
-                                    fontWeight: 600,
-                                    boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                                }}
-                            >
-                                Edit Profile
-                            </Button>
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                <Button 
+                                    variant="solid"
+                                    color="primary"
+                                    startDecorator={<FaEdit />}
+                                    onClick={() => setEditMode(true)}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        px: 3,
+                                        py: 1.5,
+                                        fontWeight: 600,
+                                        boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
+                                    }}
+                                >
+                                    Edit Profile
+                                </Button>
+                                <Button 
+                                    variant="soft"
+                                    color="primary"
+                                    startDecorator={<FiImage />}
+                                    onClick={() => navigate('/venue-images')}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        px: 3,
+                                        py: 1.5,
+                                        fontWeight: 600,
+                                        boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
+                                    }}
+                                >
+                                    Venue Images
+                                </Button>
+                            </Box>
                         )}
                     </Box>
 
