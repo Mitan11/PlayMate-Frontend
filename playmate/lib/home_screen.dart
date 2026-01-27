@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userName = 'User';
   String _userEmail = '';
   String _profileImage = '';
+
+  String _welcomePrefix = '';
+  bool _showWelcome = false;
+  Timer? _welcomeTimer;
 
   final List<Map<String, dynamic>> _dummyPosts = [
     {
@@ -63,8 +68,32 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserPosts();
   }
 
+  @override
+  void dispose() {
+    _welcomeTimer?.cancel();
+
+    super.dispose();
+  }
+
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
+    setState(() {
+      _welcomePrefix = 'Welcome';
+      _showWelcome = true;
+    });
+
+    _welcomeTimer?.cancel();
+    _welcomeTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _showWelcome = false;
+        });
+      }
+    });
+
     setState(() {
       _userName =
           '${prefs.getString('first_name') ?? 'User'} ${prefs.getString('last_name') ?? ''}';
@@ -100,13 +129,33 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         shadowColor: themeColor.withOpacity(0.1),
-        title: Text(
-          'PlayMate',
-          style: GoogleFonts.poppins(
-            color: Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'PlayMate',
+              style: GoogleFonts.poppins(
+                color: themeColor,
+                fontWeight: FontWeight.w500,
+                fontSize: 20,
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: Text(
+                '$_welcomePrefix, $_userName',
+                style: GoogleFonts.poppins(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+              secondChild: const SizedBox(height: 0, width: 0),
+              crossFadeState: _showWelcome
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              duration: const Duration(milliseconds: 800),
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -226,90 +275,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User Greeting Card
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [themeColor, themeColor.withOpacity(0.8)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: themeColor.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: Colors.white,
-                    backgroundImage: _profileImage.isNotEmpty
-                        ? NetworkImage(_profileImage)
-                        : null,
-                    child: _profileImage.isEmpty
-                        ? Icon(Icons.person, color: themeColor, size: 32)
-                        : null,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Welcome back! 👋',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                        Text(
-                          _userName.trim(),
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (_userEmail.isNotEmpty)
-                          Text(
-                            _userEmail,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
             // Posts Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Recent Activities',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
 
             ListView.separated(
               shrinkWrap: true,
