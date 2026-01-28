@@ -21,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   late int _selectedIndex;
 
   String _userName = 'User';
-  String _userEmail = '';
   String _profileImage = '';
 
   String _welcomePrefix = '';
@@ -75,29 +74,30 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _loadUserData() async {
+  Future<void> _loadUserData({bool isRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
 
     if (!mounted) return;
 
-    setState(() {
-      _welcomePrefix = 'Welcome';
-      _showWelcome = true;
-    });
+    if (!isRefresh) {
+      setState(() {
+        _welcomePrefix = 'Welcome';
+        _showWelcome = true;
+      });
 
-    _welcomeTimer?.cancel();
-    _welcomeTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _showWelcome = false;
-        });
-      }
-    });
+      _welcomeTimer?.cancel();
+      _welcomeTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _showWelcome = false;
+          });
+        }
+      });
+    }
 
     setState(() {
       _userName =
           '${prefs.getString('first_name') ?? 'User'} ${prefs.getString('last_name') ?? ''}';
-      _userEmail = prefs.getString('user_email') ?? '';
       _profileImage = prefs.getString('profile_image') ?? '';
     });
   }
@@ -265,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHomeTab() {
     return RefreshIndicator(
       onRefresh: () async {
-        await _loadUserData();
+        await _loadUserData(isRefresh: true);
         // Simulate a small delay for better UX or if data loads too fast
         await Future.delayed(const Duration(milliseconds: 500));
       },

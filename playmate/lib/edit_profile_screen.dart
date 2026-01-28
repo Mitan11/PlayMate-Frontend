@@ -25,6 +25,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
   final ImagePicker _picker = ImagePicker();
   final CropController _cropController = CropController();
@@ -54,6 +55,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _firstNameController.text = prefs.getString('first_name') ?? '';
       _lastNameController.text = prefs.getString('last_name') ?? '';
       _emailController.text = prefs.getString('user_email') ?? '';
+      _phoneController.text = prefs.getString('phone_number') ?? '';
       _currentProfileImage = prefs.getString('profile_image') ?? '';
     });
   }
@@ -177,6 +179,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       request.fields['user_email'] = _emailController.text;
       request.fields['first_name'] = firstName;
       request.fields['last_name'] = lastName;
+      request.fields['phone_number'] = _phoneController.text.trim();
 
       if (_croppedImageFile != null) {
         final String path = _croppedImageFile!.path;
@@ -225,6 +228,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             userData['first_name'] ?? firstName,
           );
           await prefs.setString('last_name', userData['last_name'] ?? lastName);
+          await prefs.setString(
+            'phone_number',
+            userData['phone_number'] ?? _phoneController.text.trim(),
+          );
           await prefs.setString(
             'profile_image',
             userData['profile_image'] ?? _currentProfileImage,
@@ -469,12 +476,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 16),
 
               _buildTextField(
+                label: 'Phone Number',
+                controller: _phoneController,
+                enabled: !_isSavingProfile,
+              ),
+              const SizedBox(height: 30),
+              
+              _buildTextField(
                 label: 'Email',
                 controller: _emailController,
                 enabled: false,
               ),
-
-              const SizedBox(height: 30),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -538,6 +551,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 }
