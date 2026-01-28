@@ -231,6 +231,23 @@ export default function Login() {
                     )}
                 </motion.button>
 
+                <motion.div
+                    className="w-full text-center mt-2"
+                    variants={itemVariants}
+                >
+                    <p className="text-sm text-gray-600">
+                        Don't have an account?{" "}
+                        <motion.span
+                            className="text-primary font-medium cursor-pointer hover:underline"
+                            onClick={() => navigate("/register")}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            Register here
+                        </motion.span>
+                    </p>
+                </motion.div>
+
             </motion.div>
         </motion.form>
     )

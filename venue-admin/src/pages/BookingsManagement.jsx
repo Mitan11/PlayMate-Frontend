@@ -65,47 +65,60 @@ function BookingsManagement() {
             key: 'user_first_name',
             label: 'User Name',
             width: 150,
-            render: (value, row) => `${row.user_first_name} ${row.user_last_name}`
+            render: (value, row) => {
+                const firstName = row.user_first_name || '';
+                const lastName = row.user_last_name || '';
+                const fullName = `${firstName} ${lastName}`.trim();
+                return fullName || '-';
+            }
         },
         {
             key: 'user_email',
             label: 'Email',
-            width: 180
+            width: 180,
+            render: (value) => value || '-'
+        },
+        {
+            key: 'phone_number',
+            label: 'Phone Number',
+            width: 180,
+            render: (value) => value || '-'
         },
         {
             key: 'sport_name',
             label: 'Sport',
-            width: 120
+            width: 120,
+            render: (value) => value || '-'
         },
         {
             key: 'booking_start',
             label: 'Start Time',
             width: 170,
-            render: (value) => new Date(value).toLocaleString('en-IN', {
+            render: (value) => value ? new Date(value).toLocaleString('en-IN', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
-            })
+            }) : '-'
         },
         {
             key: 'booking_end',
             label: 'End Time',
             width: 170,
-            render: (value) => new Date(value).toLocaleString('en-IN', {
+            render: (value) => value ? new Date(value).toLocaleString('en-IN', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
-            })
+            }) : '-'
         },
         {
             key: 'total_price',
             label: 'Total Price',
             width: 100,
-            render: (value) => `₹${value}`
+            render: (value) => value ? `₹${value}` : '-'
         },
         {
             key: 'payment',

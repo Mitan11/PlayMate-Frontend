@@ -1,6 +1,7 @@
 import { useContext } from "react";
 import { AppContext } from "./context/AppContextProvider";
 import Login from "./pages/Login";
+import RegisterForm from "./pages/RegisterForm";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import { Navigate, Route, Routes } from "react-router";
@@ -61,9 +62,11 @@ export default function App() {
                 </Box>
             </Box>
         ) : (
-            <>
-                <Login />
-            </>
+            <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<RegisterForm />} />
+                <Route path="*" element={<Navigate to="/login" />} />
+            </Routes>
         )
     )
 }

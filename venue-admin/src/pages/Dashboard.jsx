@@ -5,15 +5,18 @@ import Card from "@mui/joy/Card";
 import Typography from "@mui/joy/Typography";
 import Button from "@mui/joy/Button";
 import LinearProgress from "@mui/joy/LinearProgress";
+import Alert from "@mui/joy/Alert";
 import { useNavigate } from "react-router";
 import { AppContext } from '../context/AppContextProvider';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Preloader from "../components/Preloader";
+import { FaInfoCircle, FaTimes } from "react-icons/fa";
 
 function Dashboard() {
     const { venueOwner, backendUrl, token } = useContext(AppContext);
     const [loading, setLoading] = useState(true);
+    const [showProfileAlert, setShowProfileAlert] = useState(true);
     const [stats, setStats] = useState({
         total_bookings: 0,
         total_revenue: "0.00",
@@ -24,6 +27,12 @@ function Dashboard() {
     const [recentBookings, setRecentBookings] = useState([]);
 
     const navigate = useNavigate();
+
+    // Check if profile is incomplete
+    const isProfileIncomplete = useMemo(() => {
+        return !venueOwner?.venue_name || !venueOwner?.address || 
+               venueOwner?.venue_name === "" || venueOwner?.address === "";
+    }, [venueOwner]);
 
     // Fetch dashboard stats
     const fetchDashboardStats = useCallback(async () => {
@@ -111,6 +120,61 @@ function Dashboard() {
             style={{ width: "100%", maxWidth: "100%", overflowX: "hidden" }}
         >
             <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, maxWidth: "100%", overflowX: "hidden" }}>
+                {/* Profile Completion Alert */}
+                {isProfileIncomplete && showProfileAlert && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        <Alert
+                            color="warning"
+                            variant="soft"
+                            sx={{
+                                mb: 3,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                '& .MuiAlert-startDecorator': {
+                                    mr: 1.5
+                                }
+                            }}
+                            startDecorator={<FaInfoCircle />}
+                            endDecorator={
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                    <Button
+                                        size="sm"
+                                        variant="solid"
+                                        color="warning"
+                                        onClick={() => navigate("/profile")}
+                                    >
+                                        Complete Profile
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="plain"
+                                        color="neutral"
+                                        onClick={() => setShowProfileAlert(false)}
+                                        sx={{ minWidth: 'auto', p: 0.5 }}
+                                    >
+                                        <FaTimes />
+                                    </Button>
+                                </Box>
+                            }
+                        >
+                            <Box>
+                                <Typography level="title-md" sx={{ mb: 0.5 }}>
+                                    Complete Your Profile
+                                </Typography>
+                                <Typography level="body-sm">
+                                    Please add your venue name and address to get started with bookings.
+                                </Typography>
+                            </Box>
+                        </Alert>
+                    </motion.div>
+                )}
+
                 {/* Header Section */}
                 <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box>

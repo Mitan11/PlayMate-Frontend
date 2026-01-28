@@ -215,6 +215,7 @@ function Profile() {
     const profileFields = useMemo(() => [
         { key: "first_name", label: "First Name", icon: <FaUser />, required: true },
         { key: "last_name", label: "Last Name", icon: <FaUser />, required: true },
+        { key: "email", label: "Email Address", icon: <FaEnvelope />, required: false, readonly: true },
         { key: "phone", label: "Phone Number", icon: <FaPhone />, required: false }
     ], []);
 
@@ -545,7 +546,7 @@ function Profile() {
                                         </Typography>
 
                                         <Grid container spacing={3}>
-                                            {profileFields.map(({ key, label, icon, required }) => {
+                                            {profileFields.map(({ key, label, icon, required, readonly }) => {
                                                 const inputId = `profile-${key}`;
                                                 return (
                                                 <Grid xs={12} sm={6} key={key}>
@@ -566,7 +567,7 @@ function Profile() {
                                                                 </Typography>
                                                             )}
                                                         </FormLabel>
-                                                        {editMode ? (
+                                                        {editMode && !readonly ? (
                                                             <Input
                                                                 id={inputId}
                                                                 value={profile.venue?.[key] || ""}

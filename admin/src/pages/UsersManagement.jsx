@@ -37,7 +37,7 @@ function UsersManagement() {
                     Authorization: `Bearer ${aToken}`,
                 },
             })
-
+            console.log('Fetch Users Response:', response.data)
             if (response.data?.status) {
                 setUsers(response.data.data || [])
             } else {
@@ -76,6 +76,7 @@ function UsersManagement() {
             { key: 'first_name', label: 'First Name', width: 120 },
             { key: 'last_name', label: 'Last Name', width: 120 },
             { key: 'email', label: 'Email', width: 200 },
+            { key: 'phone_number', label: 'Phone Number', width: 200 },
             { key: 'sports', label: 'Sports & Skills', width: 250 },
 
             { key: 'created_at', label: 'Joined', width: 140 },
@@ -94,7 +95,8 @@ function UsersManagement() {
                     profile_image: user.profile_image || 'https://via.placeholder.com/40x40?text=U',
                     first_name: user.first_name || '—',
                     last_name: user.last_name || '—',
-                    email: user.user_email ?? '—',
+                    email: user.user_email || '—',
+                    phone_number: user.phone_number ?? '—',
                     sports: sportsText,
                     created_at: user.created_at
                         ? new Date(user.created_at).toLocaleString()
