@@ -21,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   late int _selectedIndex;
 
   String _userName = 'User';
-  String _userEmail = '';
   String _profileImage = '';
 
   String _welcomePrefix = '';
@@ -99,7 +98,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _userName =
           '${prefs.getString('first_name') ?? 'User'} ${prefs.getString('last_name') ?? ''}';
-      _userEmail = prefs.getString('user_email') ?? '';
       _profileImage = prefs.getString('profile_image') ?? '';
     });
   }

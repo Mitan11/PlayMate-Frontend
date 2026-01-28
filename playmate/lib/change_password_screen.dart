@@ -72,7 +72,34 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
+    // DEBUG: Print token to verify it exists and is correct
+    debugPrint('Change Password - Auth Token: $token');
+
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Authentication error. Please login again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     final uri = Uri.parse('$base/auth/change-password');
+
+    final email = prefs.getString('user_email') ?? '';
+
+    // Trying 'user_password' as it matches the Login/Register schema
+    final bodyMap = {
+      'user_email': email,
+      'currentPassword': currentPassword, // Matches login flow
+      'newPassword': newPassword,
+      'confirmPassword': confirmPassword,
+    };
+
+    debugPrint('Change Password Req Body: ${jsonEncode(bodyMap)}');
 
     setState(() => _isChangingPassword = true);
 
@@ -83,13 +110,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'currentPassword': currentPassword,
-          'newPassword': newPassword,
-        }),
+        body: jsonEncode(bodyMap),
       );
 
-      debugPrint('Change password response: ${resp.statusCode} - ${resp.body}');
+      debugPrint('Change password response body: ${resp.body}');
 
       if (resp.statusCode == 200) {
         if (mounted) {
@@ -101,35 +125,69 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           );
           Navigator.pop(context);
         }
+      } else if (resp.statusCode == 401) {
+        debugPrint('401 Unauthorized - Token might be invalid or expired.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Session expired. Please logout and login again.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+          await prefs.remove('auth_token');
+        }
       } else {
         try {
           final errorData = jsonDecode(resp.body);
-          final errorMessage = errorData['message'] ?? 'Failed to change password';
-          
-          // Handle validation errors
+          final errorMessage =
+              errorData['message'] ??
+              'Failed to change password: ${resp.statusCode}';
+
+          // Handle validation errors - checking variants
           if (errorData['errors'] != null && errorData['errors'] is Map) {
             final errors = errorData['errors'] as Map<String, dynamic>;
             setState(() {
-              _currentPasswordError = errors['current_password_error']?.toString();
-              _newPasswordError = errors['new_password_error']?.toString() ?? errors['password_error']?.toString();
-              _confirmPasswordError = errors['confirm_password_error']?.toString();
+              // Check user_password_error as well since we are using that key
+              _currentPasswordError =
+                  errors['user_password_error']?.toString() ??
+                  errors['current_password_error']?.toString() ??
+                  errors['currentPasswordError']?.toString();
+
+              _newPasswordError =
+                  errors['new_password_error']?.toString() ??
+                  errors['newPasswordError']?.toString() ??
+                  errors['password_error']?.toString();
+
+              _confirmPasswordError =
+                  errors['confirm_password_error']?.toString() ??
+                  errors['confirmPasswordError']?.toString();
             });
-            return; // Don't show general error if we have field-specific errors
+            // If we found specific errors, don't show the snackbar
+            if (_currentPasswordError != null ||
+                _newPasswordError != null ||
+                _confirmPasswordError != null) {
+              return;
+            }
           }
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(errorMessage),
+                content: Text(errorMessage), // Show server message
                 backgroundColor: Colors.red,
               ),
             );
           }
         } catch (e) {
+          // If JSON decode fails, show raw body (truncated) to help debugging
+          final rawMsg = resp.body.length > 100
+              ? resp.body.substring(0, 100)
+              : resp.body;
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to change password'),
+              SnackBar(
+                content: Text('Error ${resp.statusCode}: $rawMsg'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -140,7 +198,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       debugPrint('Error changing password: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Network Error: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:crop_your_image/crop_your_image.dart';
@@ -24,6 +25,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final emailController = TextEditingController();
+  final phoneNumberController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
@@ -48,6 +50,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String? _firstNameError;
   String? _lastNameError;
   String? _emailError;
+  String? _phoneNumberError;
   String? _passwordError;
   String? _confirmPasswordError;
 
@@ -129,6 +132,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       _firstNameError = null;
       _lastNameError = null;
       _emailError = null;
+      _phoneNumberError = null;
       _passwordError = null;
       _confirmPasswordError = null;
     });
@@ -136,6 +140,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final firstName = firstNameController.text.trim();
     final lastName = lastNameController.text.trim();
     final email = emailController.text.trim();
+    final phoneNumber = phoneNumberController.text.trim();
     final pass = passwordController.text;
     final cpass = confirmPasswordController.text;
 
@@ -155,6 +160,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       hasError = true;
     } else if (!email.contains('@') || !email.contains('.')) {
       setState(() => _emailError = 'Enter a valid email address');
+      hasError = true;
+    }
+    if (phoneNumber.isEmpty) {
+      setState(() => _phoneNumberError = 'Phone number is required');
+      hasError = true;
+    } else if (phoneNumber.length != 10) {
+      setState(
+        () => _phoneNumberError = 'Phone number must be exactly 10 digits',
+      );
       hasError = true;
     }
     if (pass.isEmpty) {
@@ -187,6 +201,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       request.fields['user_password'] = pass;
       request.fields['first_name'] = firstName;
       request.fields['last_name'] = lastName;
+      request.fields['phone_number'] = phoneNumber;
 
       if (_croppedImageFile != null) {
         request.files.add(
@@ -211,23 +226,45 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         String? token;
         try {
           final data = jsonDecode(resp.body);
-          token = data['token'] as String?;
+
+          // Try to find token at root or inside data
+          token = data['token']?.toString();
+          if (token == null && data['data'] != null && data['data'] is Map) {
+            token = data['data']['token']?.toString();
+          }
+
           msg = (data['message'] ?? msg).toString();
 
           // Save user data
-          final userData = data['data'];
-          if (userData != null) {
+          var userData = data['data'];
+          Map<String, dynamic>? userMap;
+
+          if (userData is List && userData.isNotEmpty) {
+            userMap = userData[0] as Map<String, dynamic>;
+          } else if (userData is Map) {
+            if (userData.containsKey('user')) {
+              userMap = userData['user'];
+            } else {
+              userMap = userData as Map<String, dynamic>;
+            }
+          }
+
+          if (userMap != null) {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString(
               'user_id',
-              userData['user_id']?.toString() ?? '',
+              userMap['user_id']?.toString() ?? '',
             );
-            await prefs.setString('user_email', userData['user_email'] ?? '');
-            await prefs.setString('first_name', userData['first_name'] ?? '');
-            await prefs.setString('last_name', userData['last_name'] ?? '');
+            await prefs.setString('user_email', userMap['user_email'] ?? '');
+            await prefs.setString('first_name', userMap['first_name'] ?? '');
+            await prefs.setString('last_name', userMap['last_name'] ?? '');
+            await prefs.setString(
+              'phone_number',
+              userMap['phone_number'] ?? '',
+            );
             await prefs.setString(
               'profile_image',
-              userData['profile_image'] ?? '',
+              userMap['profile_image'] ?? '',
             );
           }
         } catch (_) {}
@@ -235,6 +272,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         if (token != null && token.isNotEmpty) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', token);
+          debugPrint('Auth token saved: $token');
+        } else {
+          debugPrint('Warning: Auth token not found in registration response');
         }
 
         if (!mounted) return;
@@ -251,7 +291,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         try {
           final data = jsonDecode(resp.body);
           err = (data['message'] ?? data['error'] ?? err).toString();
-          
+
           // Handle validation errors
           if (data['errors'] != null && data['errors'] is Map) {
             final errors = data['errors'] as Map<String, dynamic>;
@@ -259,8 +299,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               _firstNameError = errors['first_name_error']?.toString();
               _lastNameError = errors['last_name_error']?.toString();
               _emailError = errors['email_error']?.toString();
+              _phoneNumberError = errors['phone_number_error']?.toString();
               _passwordError = errors['password_error']?.toString();
-              _confirmPasswordError = errors['confirm_password_error']?.toString();
+              _confirmPasswordError = errors['confirm_password_error']
+                  ?.toString();
             });
             return; // Don't show general error if we have field-specific errors
           }
@@ -456,7 +498,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       const SizedBox(height: 25),
 
                       Text(
-                        "Create Your Account 🍀",
+                        "Create Your Account",
                         style: GoogleFonts.poppins(
                           fontSize: 28,
                           fontWeight: FontWeight.w700,
@@ -504,6 +546,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         keyboardType: TextInputType.emailAddress,
                         errorText: _emailError,
                         enabled: !_isLoading,
+                      ),
+                      const SizedBox(height: 20),
+
+                      _label("Phone Number"),
+                      _inputField(
+                        controller: phoneNumberController,
+                        hint: "Enter your phone number",
+                        icon: Icons.phone_outlined,
+                        prefixText: "+91 ",
+                        keyboardType: TextInputType.phone,
+                        errorText: _phoneNumberError,
+                        enabled: !_isLoading,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
                       ),
                       const SizedBox(height: 20),
 
@@ -655,24 +713,33 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     String? errorText,
     TextInputType? keyboardType,
     Widget? suffixIcon,
+    String? prefixText,
     bool enabled = true,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
   }) {
     return TextField(
       controller: controller,
       obscureText: obscure,
       keyboardType: keyboardType,
       enabled: enabled,
+      inputFormatters: inputFormatters,
+      maxLength: maxLength,
       decoration: InputDecoration(
+        counterText: "", // Hide character counter
         prefixIcon: Icon(icon, color: themeColor),
+        prefixText: prefixText,
+        prefixStyle: GoogleFonts.poppins(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: Colors.black87,
+        ),
         suffixIcon: suffixIcon,
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
         errorText: errorText,
         errorMaxLines: 3,
-        errorStyle: TextStyle(
-          fontSize: 12,
-          height: 1.3,
-        ),
+        errorStyle: TextStyle(fontSize: 12, height: 1.3),
         filled: true,
         fillColor: enabled ? Colors.white : Colors.grey.shade200,
         enabledBorder: OutlineInputBorder(
