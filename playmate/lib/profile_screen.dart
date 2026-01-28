@@ -65,6 +65,21 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _loadUserProfile() async {
+    // Stage 1: Load locally first for immediate display
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _firstName = prefs.getString('first_name') ?? '';
+        _lastName = prefs.getString('last_name') ?? '';
+        _userEmail = prefs.getString('user_email') ?? '';
+        _profileImage = prefs.getString('profile_image') ?? '';
+        _phoneNumber = prefs.getString('phone_number') ?? '';
+      });
+      print('Loaded profile from local storage: $_firstName, $_phoneNumber');
+    } catch (e) {
+      debugPrint('Error loading local profile: $e');
+    }
+
     setState(() => _isLoadingProfile = true);
 
     try {
@@ -72,7 +87,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
       final userId = prefs.getString('user_id');
-      print('Loading profile for user_id: $userId');
+
+      print('Loading profile from API for user_id: $userId');
       if (userId == null || token == null) {
         debugPrint('Missing user_id or token');
         setState(() => _isLoadingProfile = false);
@@ -107,15 +123,17 @@ class _ProfileScreenState extends State<ProfileScreen>
         await prefs.setString('last_name', userData['last_name'] ?? '');
         await prefs.setString('user_email', userData['user_email'] ?? '');
         await prefs.setString('profile_image', userData['profile_image'] ?? '');
-        await prefs.setString('phone_number', userData['phone_number'] ?? '');
+        if (userData['phone_number'] != null) {
+          await prefs.setString('phone_number', userData['phone_number']);
+        }
         await prefs.setString('user_id', userData['user_id'].toString());
 
         setState(() {
-          _firstName = userData['first_name'] ?? '';
-          _lastName = userData['last_name'] ?? '';
-          _userEmail = userData['user_email'] ?? '';
-          _profileImage = userData['profile_image'] ?? '';
-          _phoneNumber = userData['phone_number'] ?? '';
+          _firstName = userData['first_name'] ?? _firstName;
+          _lastName = userData['last_name'] ?? _lastName;
+          _userEmail = userData['user_email'] ?? _userEmail;
+          _profileImage = userData['profile_image'] ?? _profileImage;
+          _phoneNumber = userData['phone_number'] ?? _phoneNumber;
         });
       }
     } catch (e) {

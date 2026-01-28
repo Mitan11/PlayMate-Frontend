@@ -117,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
         try {
           final data = jsonDecode(resp.body);
           err = (data['message'] ?? data['error'] ?? err).toString();
-          
+
           // Handle validation errors
           if (data['errors'] != null && data['errors'] is Map) {
             final errors = data['errors'] as Map<String, dynamic>;
@@ -216,10 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     hintText: "Enter your email",
                     errorText: _emailError,
                     errorMaxLines: 3,
-                    errorStyle: TextStyle(
-                      fontSize: 12,
-                      height: 1.3,
-                    ),
+                    errorStyle: TextStyle(fontSize: 12, height: 1.3),
                     filled: true,
                     fillColor: !_isLoading
                         ? Colors.green.shade50
@@ -291,10 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     hintText: "Enter your password",
                     errorText: _passwordError,
                     errorMaxLines: 3,
-                    errorStyle: TextStyle(
-                      fontSize: 12,
-                      height: 1.3,
-                    ),
+                    errorStyle: TextStyle(fontSize: 12, height: 1.3),
                     filled: true,
                     fillColor: !_isLoading
                         ? Colors.green.shade50
