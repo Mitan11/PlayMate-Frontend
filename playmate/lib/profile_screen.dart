@@ -25,6 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _firstName = '';
   String _lastName = '';
   String _userEmail = '';
+  String _phoneNumber = '';
   String _profileImage = '';
   List<Map<String, dynamic>> _userSports = [];
   List<Map<String, dynamic>> _availableSports = [];
@@ -91,12 +92,22 @@ class _ProfileScreenState extends State<ProfileScreen>
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        final userData = data['data']['user'];
+        Map<String, dynamic> userData;
+        if (data['data'] is List) {
+          userData = (data['data'] as List).isNotEmpty
+              ? data['data'][0]
+              : {}; // Handle list response
+        } else {
+          userData =
+              data['data']['user'] ??
+              data['data']; // Handle nested or direct map
+        }
 
         await prefs.setString('first_name', userData['first_name'] ?? '');
         await prefs.setString('last_name', userData['last_name'] ?? '');
         await prefs.setString('user_email', userData['user_email'] ?? '');
         await prefs.setString('profile_image', userData['profile_image'] ?? '');
+        await prefs.setString('phone_number', userData['phone_number'] ?? '');
         await prefs.setString('user_id', userData['user_id'].toString());
 
         setState(() {
@@ -104,6 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           _lastName = userData['last_name'] ?? '';
           _userEmail = userData['user_email'] ?? '';
           _profileImage = userData['profile_image'] ?? '';
+          _phoneNumber = userData['phone_number'] ?? '';
         });
       }
     } catch (e) {
@@ -614,6 +626,14 @@ class _ProfileScreenState extends State<ProfileScreen>
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 _userEmail,
+                style: GoogleFonts.poppins(fontSize: 14, color: Colors.black54),
+              ),
+            ),
+          if (_phoneNumber.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                _phoneNumber,
                 style: GoogleFonts.poppins(fontSize: 14, color: Colors.black54),
               ),
             ),
