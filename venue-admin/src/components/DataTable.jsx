@@ -6,6 +6,8 @@ import Sheet from '@mui/joy/Sheet';
 import Skeleton from '@mui/joy/Skeleton';
 import Typography from '@mui/joy/Typography';
 import Input from '@mui/joy/Input';
+import Link from '@mui/joy/Link';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 function DataTable({
     columns,
@@ -20,10 +22,11 @@ function DataTable({
     pageSize = 7,
     debounceDelay = 300,
     throttleDelay = 100,
+    defaultSort = { key: "no", direction: 'asc' },
 }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-    const [sortConfig, setSortConfig] = useState();
+    const [sortConfig, setSortConfig] = useState(defaultSort);
     const [page, setPage] = useState(1);
     const debounceTimeoutRef = useRef(null);
     const throttleTimeoutRef = useRef(null);
@@ -180,29 +183,58 @@ function DataTable({
                 >
                     <thead>
                         <tr>
-                            {columns.map((col) => (
-                                <th
-                                    key={col.key}
-                                    style={{
-                                        width: col.width,
-                                        cursor: 'pointer',
-                                        userSelect: 'none'
-                                    }}
-                                    onClick={throttle(() => {
+                            {columns.map((col) => {
+                                const active = sortConfig?.key === col.key;
+                                const createSortHandler = (key) =>
+                                    throttle(() => {
                                         setSortConfig((prev) => ({
-                                            key: col.key,
+                                            key: key,
                                             direction:
-                                                prev?.key === col.key && prev.direction === 'asc'
+                                                prev?.key === key && prev.direction === 'asc'
                                                     ? 'desc'
                                                     : 'asc',
                                         }))
-                                    }, throttleDelay)}
-                                >
-                                    {col.label}
-                                    {sortConfig?.key === col.key &&
-                                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                                </th>
-                            ))}
+                                    }, throttleDelay);
+
+                                return (
+                                    <th
+                                        key={col.key}
+                                        style={{ width: col.width }}
+                                    >
+                                        <Link
+                                            underline="none"
+                                            color="neutral"
+                                            textColor={active ? 'primary.plainColor' : undefined}
+                                            component="button"
+                                            onClick={createSortHandler(col.key)}
+                                            endDecorator={
+                                                <ArrowDownwardIcon
+                                                    sx={{
+                                                        opacity: active ? 1 : 0,
+                                                        fontSize: '1rem'
+                                                    }}
+                                                />
+                                            }
+                                            sx={{
+                                                fontWeight: 'lg',
+                                                width: '100%',
+                                                justifyContent: 'flex-start',
+                                                '& svg': {
+                                                    transition: '0.2s',
+                                                    transform:
+                                                        active && sortConfig.direction === 'desc'
+                                                            ? 'rotate(0deg)'
+                                                            : 'rotate(180deg)',
+                                                },
+                                                '&:hover': { '& svg': { opacity: 1 } },
+                                                position : 'static', 
+                                            }}
+                                        >
+                                            {col.label}
+                                        </Link>
+                                    </th>
+                                );
+                            })}
                             {actions.length > 0 && (
                                 <th style={{ width: 'var(--Table-lastColumnWidth)' }} />
                             )}
