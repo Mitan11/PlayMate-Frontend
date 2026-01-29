@@ -90,7 +90,7 @@ function Dashboard() {
         fetchDashboardStats();
     }, [fetchDashboardStats]);
 
-
+console.log('Recent Bookings:', recentBookings);
 
     const containerVariants = {
         hidden: { opacity: 0, y: 10 },
@@ -367,7 +367,7 @@ function Dashboard() {
                                                         {`${booking.first_name} ${booking.last_name}`}
                                                     </Typography>
                                                     <Typography level="body-xs" sx={{ color: "neutral.500", mb: 0.25 }}>
-                                                        {`${booking.start_time} - ${booking.end_time}`}
+                                                        {`${new Date(booking.start_datetime).toLocaleTimeString()} - ${new Date(booking.end_datetime).toLocaleTimeString()}`}
                                                     </Typography>
                                                     <Typography level="body-xs" sx={{ color: "neutral.400" }}>
                                                         {new Date(booking.start_datetime).toLocaleDateString()}

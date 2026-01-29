@@ -425,7 +425,7 @@ function VenueAnalytics() {
                                             {recentBookings.map((booking, index) => (
                                                 <tr key={index}>
                                                     <td>{`${booking.first_name} ${booking.last_name}`}</td>
-                                                    <td>{`${booking.start_time} - ${booking.end_time}`}</td>
+                                                    <td>{`${new Date(booking.start_datetime).toLocaleTimeString()} - ${new Date(booking.end_datetime).toLocaleTimeString()}`}</td>
                                                     <td>
                                                         <Chip variant="soft" color="success">
                                                             ₹{booking.total_price}
