@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -17,7 +19,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _textController = TextEditingController();
   final FocusNode _textFocusNode = FocusNode();
-  
+
   File? _selectedImage;
   bool _isLoading = false;
   bool _isPosting = false;
@@ -103,48 +105,95 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
-      
+      final token = prefs.getString('auth_token');
+
       if (userId == null) {
         throw Exception('User not logged in');
       }
 
-      // Create post data
-      Map<String, dynamic> postData = {
-        'timestamp': DateTime.now().toIso8601String(),
-      };
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final uri = Uri.parse('$base/user/createPost/$userId');
 
-      // Add text content if available
       final textContent = _textController.text.trim();
-      if (textContent.isNotEmpty) {
-        postData['caption'] = textContent;
+
+      // Create multipart request for file upload
+      final request = http.MultipartRequest('POST', uri);
+
+      // Add headers
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
       }
 
-      // Add image path if available
+      // Add form fields
+      request.fields['user_id'] = int.tryParse(userId).toString() ?? userId;
+      request.fields['text_content'] = textContent.isNotEmpty
+          ? textContent
+          : '';
+
+      // Add image file if selected
       if (_selectedImage != null) {
-        postData['path'] = _selectedImage!.path;
+        final imageFile = http.MultipartFile.fromBytes(
+          'media_url',
+          await _selectedImage!.readAsBytes(),
+          filename: _selectedImage!.path.split('/').last,
+        );
+        request.files.add(imageFile);
       }
 
-      // Get existing posts
-      final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
+      final streamedResponse = await request.send();
+      final resp = await http.Response.fromStream(streamedResponse);
+      // Parse API response which uses the format:
+      // { status, statusCode, message, data, token, timestamp }
+      String respMessage = 'Post created successfully';
+      bool success = false;
+      try {
+        final Map<String, dynamic> respData = jsonDecode(resp.body);
+        respMessage = (respData['message'] ?? respMessage).toString();
+        success =
+            (respData['status'] == true) ||
+            (respData['statusCode'] == 201) ||
+            (resp.statusCode == 201);
+      } catch (_) {
+        success = resp.statusCode == 200 || resp.statusCode == 201;
+      }
 
-      // Add new post (as JSON string to support both text and image)
-      currentPosts.insert(0, jsonEncode(postData));
+      if (success) {
+        // Persist locally as before for fast local reads
+        Map<String, dynamic> postData = {
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        if (textContent.isNotEmpty) postData['caption'] = textContent;
+        if (_selectedImage != null) postData['path'] = _selectedImage!.path;
 
-      // Save updated posts
-      await prefs.setStringList('user_posts_$userId', currentPosts);
+        final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
+        currentPosts.insert(0, jsonEncode(postData));
+        await prefs.setStringList('user_posts_$userId', currentPosts);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Post created successfully!',
-              style: GoogleFonts.poppins(),
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(respMessage, style: GoogleFonts.poppins()),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
             ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        Navigator.pop(context, true); // Return success
+          );
+          Navigator.pop(context, true); // Return success
+        }
+      } else {
+        final err = respMessage.isNotEmpty
+            ? respMessage
+            : 'Failed to create post';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Error creating post: $err',
+                style: GoogleFonts.poppins(),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

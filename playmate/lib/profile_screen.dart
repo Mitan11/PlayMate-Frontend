@@ -233,10 +233,56 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _loadUserPosts() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_id');
-    if (userId != null) {
-      setState(() {
-        _userPosts = prefs.getStringList('user_posts_$userId') ?? [];
-      });
+    if (userId == null) return;
+
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final token = prefs.getString('auth_token');
+      final uri = Uri.parse('$base/user/userPosts/$userId');
+
+      final resp = await http.get(
+        uri,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      debugPrint('User posts API response: ${resp.statusCode} - ${resp.body}');
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final postsWrapper = data['data']?['posts'];
+
+        if (postsWrapper != null && postsWrapper['posts'] != null) {
+          final apiPosts = List<Map<String, dynamic>>.from(
+            postsWrapper['posts'],
+          );
+
+          // Convert API posts to local storage format (JSON strings)
+          final List<String> localPosts = apiPosts.map((p) {
+            final Map<String, dynamic> local = {
+              'post_id': p['post_id'],
+              'caption': p['text_content'] ?? '',
+              'media_url': p['media_url'] ?? '', // Store full URL from API
+              'timestamp': p['created_at'] ?? DateTime.now().toIso8601String(),
+            };
+            return jsonEncode(local);
+          }).toList();
+
+          // Update UI with API data (no persistence to SharedPreferences)
+          if (mounted) {
+            setState(() {
+              _userPosts = localPosts;
+            });
+          }
+        } else {
+          // No posts returned
+          if (mounted) setState(() => _userPosts = []);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user posts from API: $e');
     }
   }
 
@@ -930,7 +976,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildTwitterPostItem(int index) {
     String postItem = _userPosts[index];
-    String? imagePath;
+    String? imageUrl;
     String? caption;
     String? textContent;
     String timestamp = 'now';
@@ -938,7 +984,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       if (postItem.trim().startsWith('{')) {
         final Map<String, dynamic> data = jsonDecode(postItem);
-        imagePath = data['path'];
+        imageUrl = data['media_url']; // Get URL from API response
         caption = data['caption'];
         textContent = data['caption'];
 
@@ -957,13 +1003,13 @@ class _ProfileScreenState extends State<ProfileScreen>
           }
         }
       } else {
-        imagePath = postItem;
+        imageUrl = postItem;
       }
     } catch (e) {
-      imagePath = postItem;
+      imageUrl = postItem;
     }
 
-    final bool hasImage = imagePath != null && imagePath.isNotEmpty;
+    final bool hasImage = imageUrl != null && imageUrl.isNotEmpty;
     final bool hasText = textContent != null && textContent.isNotEmpty;
 
     return GestureDetector(
@@ -972,7 +1018,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           context,
           MaterialPageRoute(
             builder: (_) => PostDetailScreen(
-              imageFile: hasImage ? File(imagePath!) : null,
+              imageFile: null, // Not using local file anymore
               postIndex: index,
               caption: caption,
               textContent: textContent,
@@ -1080,15 +1126,25 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ],
 
-                  // Image content
+                  // Image content - Display from URL
                   if (hasImage) ...[
                     const SizedBox(height: 12),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        File(imagePath),
+                      child: Image.network(
+                        imageUrl,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 200,
+                            color: Colors.grey.shade100,
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        },
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
                             height: 200,
