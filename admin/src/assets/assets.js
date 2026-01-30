@@ -7,6 +7,7 @@ import users_icon from './users_icon.svg'
 import venue_icon from './venue_icon.svg'
 import posts_icon from './posts_icon.svg'
 import like_icon from './like_icon.svg'
+import cat from './cat.svg'
 
 export const assets = {
     admin_logo,
@@ -18,4 +19,5 @@ export const assets = {
     venue_icon,
     posts_icon,
     like_icon,
+    cat
 }

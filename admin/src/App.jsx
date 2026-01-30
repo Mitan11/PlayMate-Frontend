@@ -11,6 +11,7 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import UsersManagement from "./pages/UsersManagement";
 import VenueManagement from "./pages/VenueManagement";
 import PostsManagement from "./pages/PostsManagement";
+import NotFound from "./components/NotFound";
 
 export default function App() {
     const { aToken } = useContext(AppContext);
@@ -53,7 +54,7 @@ export default function App() {
                             <Route path="/users-management" element={<UsersManagement />} />
                             <Route path="/venue-management" element={<VenueManagement />} />
                             <Route path="/posts-management" element={<PostsManagement />} />
-                            <Route path="*" element={<Navigate to="/admin-dashboard" />} />
+                            <Route path="*" element={<NotFound />} />
                         </Routes>
                     </Box>
                 </Box>

@@ -13,6 +13,7 @@ import VenueSports from "./pages/VenueSports";
 import BookingsManagement from "./pages/BookingsManagement";
 import SlotsManagement from "./pages/SlotsManagement";
 import VenueImages from "./pages/VenueImages";
+import NotFound from "./components/NotFound";
 
 export default function App() {
     const { token } = useContext(AppContext);
@@ -56,7 +57,7 @@ export default function App() {
                             <Route path="/bookings" element={<BookingsManagement />} />
                             <Route path="/slots" element={<SlotsManagement />} />
                             <Route path="/venue-images" element={<VenueImages />} />
-                            <Route path="*" element={<Navigate to="/dashboard" />} />
+                            <Route path="*" element={<NotFound />} />
                         </Routes>
                     </Box>
                 </Box>
@@ -65,7 +66,7 @@ export default function App() {
             <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<RegisterForm />} />
-                <Route path="*" element={<Navigate to="/login" />} />
+                <Route path="*" element={<NotFound />} />
             </Routes>
         )
     )

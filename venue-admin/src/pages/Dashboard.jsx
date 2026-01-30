@@ -90,8 +90,6 @@ function Dashboard() {
         fetchDashboardStats();
     }, [fetchDashboardStats]);
 
-console.log('Recent Bookings:', recentBookings);
-
     const containerVariants = {
         hidden: { opacity: 0, y: 10 },
         visible: {
