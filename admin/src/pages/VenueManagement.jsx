@@ -79,7 +79,7 @@ function VenueManagement() {
             { key: 'phone', label: 'Phone', width: 130 },
             { key: 'venue_name', label: 'Venue Name', width: 180 },
             { key: 'address', label: 'Address', width: 150 },
-            { key: 'sports', label: 'Sports & Pricing', width: 250 },
+            { key: 'sports', label: 'Sports', width: 250 },
             { key: 'created_at', label: 'Joined', width: 140 },
         ],
         []

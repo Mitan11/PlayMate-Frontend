@@ -40,7 +40,6 @@ function AdminAnalytics() {
     const [mostLikedPostsData, setMostLikedPostsData] = useState([]);
     const [topContentCreatorsData, setTopContentCreatorsData] = useState([]);
 
-    const [range, setRange] = useState("daily");
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -189,10 +188,6 @@ function AdminAnalytics() {
         <Box sx={{ p: 3, maxWidth: '100%', overflow: 'hidden' }}>
             <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography level="h2">Comprehensive Analytics Dashboard</Typography>
-                <Select value={range} onChange={(_, v) => setRange(v)}>
-                    <Option value="daily">Daily View</Option>
-                    <Option value="monthly">Monthly View</Option>
-                </Select>
             </Box>
 
             {/* Growth Metrics Section */}
