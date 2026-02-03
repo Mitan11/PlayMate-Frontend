@@ -7,6 +7,12 @@ import 'package:playmate/profile_screen.dart';
 import 'package:playmate/create_post_screen.dart';
 import 'package:playmate/play_screen.dart';
 import 'package:playmate/booking_screen.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:convert';
+import 'dart:developer';
+
+import 'package:playmate/post_state.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
@@ -27,50 +33,37 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showWelcome = false;
   Timer? _welcomeTimer;
 
-  final List<Map<String, dynamic>> _dummyPosts = [
-    {
-      'name': 'Rahul Kumar',
-      'time': '2h ago',
-      'text': 'Looking for a tennis partner for this weekend! 🎾',
-      'likes': 12,
-      'comments': 4,
-    },
-    {
-      'name': 'Priya Singh',
-      'time': '4h ago',
-      'text':
-          'Had an amazing badminton match today. The court facilities were top notch! 🏸',
-      'likes': 85,
-      'comments': 12,
-    },
-    {
-      'name': 'Amit Patel',
-      'time': '6h ago',
-      'text': 'Just finished a 10k run. Feeling pumped! 🏃‍♂️',
-      'likes': 42,
-      'comments': 8,
-    },
-    {
-      'name': 'Sneha Gupta',
-      'time': '1d ago',
-      'text': 'Anyone interested in a friendly cricket match this Sunday?',
-      'likes': 28,
-      'comments': 15,
-    },
-  ];
+  List<Map<String, dynamic>> _recentActivities = [];
+  bool _isLoadingActivities = true;
+
+  StreamSubscription? _postUpdateSubscription;
 
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
     _loadUserData();
-    _loadUserPosts();
+    _loadRecentActivities();
+
+    _postUpdateSubscription = PostState().onPostUpdate.listen((update) {
+      if (!mounted) return;
+
+      final index = _recentActivities.indexWhere(
+        (a) => a['post_id'] == update.postId,
+      );
+      if (index != -1) {
+        setState(() {
+          _recentActivities[index]['likes_count'] = update.likeCount;
+          _recentActivities[index]['is_liked_by_user'] = update.isLiked;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _welcomeTimer?.cancel();
-
+    _postUpdateSubscription?.cancel();
     super.dispose();
   }
 
@@ -100,6 +93,61 @@ class _HomeScreenState extends State<HomeScreen> {
           '${prefs.getString('first_name') ?? 'User'} ${prefs.getString('last_name') ?? ''}';
       _profileImage = prefs.getString('profile_image') ?? '';
     });
+  }
+
+  Future<void> _loadRecentActivities() async {
+    setState(() => _isLoadingActivities = true);
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
+
+      if (userId == null || token == null) {
+        setState(() => _isLoadingActivities = false);
+        return;
+      }
+
+      final uri = Uri.parse(
+        '$base/user/recentActivities/$userId?page=1&limit=10',
+      );
+      final resp = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      log('Recent activities response: ${resp.statusCode} - ${resp.body}');
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        // data structure: { data: { posts: [...] } }
+        if (data['data'] != null && data['data']['posts'] != null) {
+          setState(() {
+            _recentActivities = List<Map<String, dynamic>>.from(
+              data['data']['posts'],
+            );
+          });
+        } else if (data['data'] is List) {
+          // Fallback if it returns a direct list
+          setState(() {
+            _recentActivities = List<Map<String, dynamic>>.from(data['data']);
+          });
+        } else {
+          setState(() => _recentActivities = []);
+        }
+      } else {
+        debugPrint('Failed to load activities: ${resp.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error loading recent activities: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingActivities = false);
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -160,13 +208,16 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.add_circle_outline, color: themeColor),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const CreatePostScreen(),
                 ),
               );
+              if (result == true) {
+                _loadRecentActivities();
+              }
             },
           ),
           IconButton(
@@ -265,9 +316,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHomeTab() {
     return RefreshIndicator(
       onRefresh: () async {
-        await _loadUserData(isRefresh: true);
-        // Simulate a small delay for better UX or if data loads too fast
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.wait([
+          _loadUserData(isRefresh: true),
+          _loadRecentActivities(),
+        ]);
       },
       color: themeColor,
       child: SingleChildScrollView(
@@ -278,16 +330,44 @@ class _HomeScreenState extends State<HomeScreen> {
             // Posts Section
             const SizedBox(height: 5),
 
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _dummyPosts.length,
-              separatorBuilder: (context, index) =>
-                  Divider(height: 1, color: Colors.grey.shade200),
-              itemBuilder: (context, index) {
-                return _buildDummyPostItem(index);
-              },
-            ),
+            if (_isLoadingActivities)
+              Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Center(
+                  child: CircularProgressIndicator(color: themeColor),
+                ),
+              )
+            else if (_recentActivities.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.feed_outlined,
+                        size: 48,
+                        color: Colors.grey.shade300,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No recent activities',
+                        style: GoogleFonts.poppins(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _recentActivities.length,
+                separatorBuilder: (context, index) =>
+                    Divider(height: 1, color: Colors.grey.shade200),
+                itemBuilder: (context, index) {
+                  return _buildActivityItem(index);
+                },
+              ),
 
             const SizedBox(height: 80),
           ],
@@ -296,18 +376,51 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _loadUserPosts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id');
-    if (userId != null) {
-      setState(() {
-        // Posts loaded
-      });
-    }
-  }
+  Widget _buildActivityItem(int index) {
+    final activity = _recentActivities[index];
 
-  Widget _buildDummyPostItem(int index) {
-    final post = _dummyPosts[index];
+    // Parse data safely
+    String firstName = '';
+    String lastName = '';
+
+    if (activity['user'] != null) {
+      firstName = activity['user']['first_name'] ?? '';
+      lastName = activity['user']['last_name'] ?? '';
+    } else {
+      // Try top level
+      firstName = activity['first_name'] ?? '';
+      lastName = activity['last_name'] ?? '';
+    }
+
+    String name = '$firstName $lastName'.trim();
+    if (name.isEmpty) {
+      name = 'PlayMate User';
+    }
+
+    final String profileUrl =
+        activity['user']?['profile_image'] ?? activity['profile_image'] ?? '';
+    final String text = activity['text_content'] ?? activity['caption'] ?? '';
+    final String? mediaUrl = activity['media_url'];
+
+    final int likes = activity['likes_count'] ?? activity['like_count'] ?? 0;
+    final bool isLiked = activity['is_liked_by_user'] == true;
+
+    String timeAgo = 'Just now';
+    if (activity['created_at'] != null) {
+      try {
+        final date = DateTime.parse(activity['created_at']);
+        final diff = DateTime.now().difference(date);
+        if (diff.inDays > 0)
+          timeAgo = '${diff.inDays}d ago';
+        else if (diff.inHours > 0)
+          timeAgo = '${diff.inHours}h ago';
+        else if (diff.inMinutes > 0)
+          timeAgo = '${diff.inMinutes}m ago';
+      } catch (e) {
+        // ignore
+      }
+    }
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
@@ -316,14 +429,19 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: Colors.blue.shade100,
-            child: Text(
-              post['name'][0],
-              style: GoogleFonts.poppins(
-                color: Colors.blue.shade800,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            backgroundColor: themeColor.withOpacity(0.1),
+            backgroundImage: profileUrl.isNotEmpty
+                ? NetworkImage(profileUrl)
+                : null,
+            child: profileUrl.isEmpty
+                ? Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                    style: GoogleFonts.poppins(
+                      color: themeColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -333,7 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(
                   children: [
                     Text(
-                      post['name'],
+                      name,
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -350,7 +468,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      post['time'],
+                      timeAgo,
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         color: Colors.grey.shade600,
@@ -359,31 +477,53 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  post['text'],
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    color: Colors.black87,
-                    height: 1.4,
+                if (text.isNotEmpty)
+                  Text(
+                    text,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
                   ),
-                ),
+                if (mediaUrl != null && mediaUrl.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      mediaUrl,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const SizedBox(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.favorite_border,
-                      size: 20,
-                      color: Colors.grey.shade500,
+                InkWell(
+                  onTap: () => _togglePostLike(index),
+                  borderRadius: BorderRadius.circular(50),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          size: 20,
+                          color: isLiked ? Colors.red : Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$likes',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: isLiked ? Colors.red : Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${post['likes']}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -391,6 +531,118 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _togglePostLike(int index) async {
+    final activity = _recentActivities[index];
+    final postId = activity['post_id'];
+
+    if (postId == null) return;
+
+    // Optimistic UI update
+    setState(() {
+      final bool isLiked = activity['is_liked_by_user'] == true;
+      activity['is_liked_by_user'] = !isLiked;
+      // Handle both keys
+      int current = activity['likes_count'] ?? activity['like_count'] ?? 0;
+      activity['likes_count'] = current + (isLiked ? -1 : 1);
+    });
+
+    final int newCount = activity['likes_count'];
+    final bool newLiked = activity['is_liked_by_user'];
+
+    // Notify others
+    PostState().updatePost(postId, newCount, newLiked);
+
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
+
+      if (token == null || userId == null) return;
+
+      final uri = Uri.parse('$base/user/toggle/$postId/$userId');
+      final resp = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body);
+        final data = body['data'] ?? body;
+
+        int finalCount = newCount;
+        bool finalLiked = newLiked;
+        bool updated = false;
+
+        if (data['like_count'] != null) {
+          finalCount = data['like_count'];
+          updated = true;
+        }
+
+        // Check for explicit status first
+        if (data['is_liked_by_user'] != null || data['liked'] != null) {
+          finalLiked = (data['is_liked_by_user'] ?? data['liked']) == true;
+          updated = true;
+
+          // If likers list is also there, update count from it
+          if (data['likers'] != null && data['likers'] is List) {
+            finalCount = (data['likers'] as List).length;
+          }
+        } else if (data['likers'] != null && data['likers'] is List) {
+          final likers = List<dynamic>.from(data['likers']);
+          // Override count with likers length
+          finalCount = likers.length;
+          updated = true;
+
+          final String uidStr = userId.toString();
+          finalLiked = likers.any((l) {
+            if (l is Map) {
+              return l['user_id']?.toString() == uidStr ||
+                  l['id']?.toString() == uidStr;
+            }
+            return l.toString() == uidStr;
+          });
+        }
+
+        if (updated) {
+          setState(() {
+            activity['likes_count'] = finalCount;
+            activity['is_liked_by_user'] = finalLiked;
+          });
+          PostState().updatePost(postId, finalCount, finalLiked);
+        }
+      } else {
+        // Revert if failed
+        setState(() {
+          final bool isLiked = activity['is_liked_by_user'] == true;
+          activity['is_liked_by_user'] = !isLiked;
+          activity['likes_count'] =
+              (activity['likes_count'] ?? 0) + (!isLiked ? 1 : -1);
+        });
+
+        final int revertedCount = activity['likes_count'];
+        final bool revertedLiked = activity['is_liked_by_user'];
+        PostState().updatePost(postId, revertedCount, revertedLiked);
+
+        debugPrint('Failed to toggle like: ${resp.body}');
+      }
+    } catch (e) {
+      debugPrint('Error toggling like: $e');
+      // Revert if error
+      if (mounted) {
+        setState(() {
+          final bool isLiked = activity['is_liked_by_user'] == true;
+          activity['is_liked_by_user'] = !isLiked; // Revert back
+          activity['likes_count'] =
+              (activity['likes_count'] ?? 0) + (isLiked ? -1 : 1);
+        });
+      }
+    }
   }
 
   Widget _buildPlaceholder() {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,7 +9,8 @@ import 'package:playmate/create_post_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:playmate/post_state.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -34,6 +36,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   Map<int, bool> _likedPosts = {};
   Map<int, int> _postLikes = {};
 
+  StreamSubscription? _postUpdateSubscription;
+
   final Map<String, IconData> _sportIcons = {
     'Football': Icons.sports_soccer,
     'Basketball': Icons.sports_basketball,
@@ -56,12 +60,24 @@ class _ProfileScreenState extends State<ProfileScreen>
     _loadUserSports();
     _loadAvailableSports();
     _loadUserPosts();
-  }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+    _postUpdateSubscription = PostState().onPostUpdate.listen((update) {
+      if (!mounted) return;
+      for (int i = 0; i < _userPosts.length; i++) {
+        try {
+          final data = jsonDecode(_userPosts[i]);
+          final pid = data['post_id'];
+          if (pid == update.postId ||
+              pid.toString() == update.postId.toString()) {
+            setState(() {
+              _likedPosts[i] = update.isLiked;
+              _postLikes[i] = update.likeCount;
+            });
+            break;
+          }
+        } catch (_) {}
+      }
+    });
   }
 
   Future<void> _loadUserProfile() async {
@@ -261,11 +277,18 @@ class _ProfileScreenState extends State<ProfileScreen>
 
           // Convert API posts to local storage format (JSON strings)
           final List<String> localPosts = apiPosts.map((p) {
+            // Determine the actual like status from API
+            final bool isLiked =
+                (p['is_liked_by_user'] ?? p['liked'] ?? p['is_liked']) == true;
+            final int likeCount = p['like_count'] ?? p['likes_count'] ?? 0;
+
             final Map<String, dynamic> local = {
               'post_id': p['post_id'],
               'caption': p['text_content'] ?? '',
               'media_url': p['media_url'] ?? '', // Store full URL from API
               'timestamp': p['created_at'] ?? DateTime.now().toIso8601String(),
+              'like_count': likeCount,
+              'is_liked_by_user': isLiked,
             };
             return jsonEncode(local);
           }).toList();
@@ -274,6 +297,21 @@ class _ProfileScreenState extends State<ProfileScreen>
           if (mounted) {
             setState(() {
               _userPosts = localPosts;
+              // Reset and repopulate like states based on fresh API data
+              _likedPosts.clear();
+              _postLikes.clear();
+              for (int i = 0; i < apiPosts.length; i++) {
+                final p = apiPosts[i];
+                // Check all possible like status keys
+                _likedPosts[i] =
+                    (p['is_liked_by_user'] ?? p['liked'] ?? p['is_liked']) ==
+                    true;
+                _postLikes[i] = p['like_count'] ?? p['likes_count'] ?? 0;
+              }
+
+              debugPrint(
+                'Loaded ${_userPosts.length} posts with like states: $_likedPosts',
+              );
             });
           }
         } else {
@@ -666,6 +704,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   children: [
                     _buildStatItem('${_userPosts.length}', 'Posts'),
                     _buildStatItem('${_userSports.length}', 'Sports'),
+                    _buildStatItem(
+                      '${_postLikes.values.fold(0, (sum, count) => sum + count)}',
+                      'Likes',
+                    ),
                   ],
                 ),
               ),
@@ -980,6 +1022,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     String? caption;
     String? textContent;
     String timestamp = 'now';
+    int? postId;
 
     try {
       if (postItem.trim().startsWith('{')) {
@@ -987,6 +1030,9 @@ class _ProfileScreenState extends State<ProfileScreen>
         imageUrl = data['media_url']; // Get URL from API response
         caption = data['caption'];
         textContent = data['caption'];
+        postId = data['post_id'] is int
+            ? data['post_id']
+            : int.tryParse(data['post_id'].toString());
 
         // Calculate time ago
         if (data['timestamp'] != null) {
@@ -1022,6 +1068,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               postIndex: index,
               caption: caption,
               textContent: textContent,
+              postId: postId,
             ),
           ),
         );
@@ -1163,35 +1210,47 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                   // Engagement section
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _toggleLike(index),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _likedPosts[index] == true
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              size: 20,
-                              color: _likedPosts[index] == true
+                  InkWell(
+                    onTap: () => _toggleLike(index),
+                    borderRadius: BorderRadius.circular(50),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            (_likedPosts[index] == true)
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            size: 20,
+                            color: (_likedPosts[index] == true)
+                                ? Colors.red
+                                : Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            (_likedPosts[index] == true) ? 'Liked' : 'Like',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: (_likedPosts[index] == true)
                                   ? Colors.red
                                   : Colors.grey.shade500,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${_postLikes[index] ?? (index * 3 + 5)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: _likedPosts[index] == true
-                                    ? Colors.red
-                                    : Colors.grey.shade500,
-                              ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_postLikes[index] ?? 0}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              color: (_likedPosts[index] == true)
+                                  ? Colors.red
+                                  : Colors.grey.shade500,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -1200,18 +1259,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ),
     );
-  }
-
-  void _toggleLike(int index) {
-    setState(() {
-      if (_likedPosts[index] == true) {
-        _likedPosts[index] = false;
-        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) - 1;
-      } else {
-        _likedPosts[index] = true;
-        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) + 1;
-      }
-    });
   }
 
   Future<void> _deletePostAtIndex(int index) async {
@@ -1254,13 +1301,63 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (confirmed == true) {
       try {
+        final base = dotenv.env['BASE_URL'] ?? '';
         final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token');
         final userId = prefs.getString('user_id');
-        if (userId != null) {
-          final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
-          if (index >= 0 && index < currentPosts.length) {
-            currentPosts.removeAt(index);
-            await prefs.setStringList('user_posts_$userId', currentPosts);
+
+        if (token == null || userId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Authentication required'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        if (index >= 0 && index < _userPosts.length) {
+          final postJson = _userPosts[index];
+          String? postId;
+          try {
+            final Map<String, dynamic> postMap = jsonDecode(postJson);
+            postId = postMap['post_id']?.toString();
+          } catch (e) {
+            debugPrint('Error parsing post data: $e');
+          }
+
+          if (postId == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invalid post data'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          final uri = Uri.parse('$base/user/deletePost/$postId/$userId');
+          final resp = await http.delete(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+          );
+
+          debugPrint('Delete post API response: ${resp.statusCode}');
+
+          if (resp.statusCode == 200) {
+            // Remove from local list immediately for UI responsiveness
+            setState(() {
+              _userPosts.removeAt(index);
+            });
+
+            // Also try to remove from SharedPreferences to keep it consistent (optional but good)
+            final userId = prefs.getString('user_id');
+            if (userId != null) {
+              // We will just rely on _loadUserPosts() eventually consistent.
+            }
             _loadUserPosts();
 
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1272,14 +1369,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                 backgroundColor: Colors.green,
               ),
             );
+          } else {
+            final errorData = jsonDecode(resp.body);
+            final errorMessage =
+                errorData['message'] ?? 'Failed to delete post';
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         }
       } catch (e) {
+        debugPrint('Error deleting post: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting post: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -1573,5 +1679,165 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
     );
+  }
+
+  Future<void> _toggleLike(int index) async {
+    if (index < 0 || index >= _userPosts.length) return;
+
+    final postJson = _userPosts[index];
+    int? postId;
+    bool currentLiked = false;
+    int currentCount = 0;
+
+    try {
+      final Map<String, dynamic> data = jsonDecode(postJson);
+      postId = data['post_id'] is int
+          ? data['post_id']
+          : int.tryParse(data['post_id'].toString());
+
+      // Check local state map, fallback to parsed data
+      currentLiked = _likedPosts.containsKey(index)
+          ? _likedPosts[index]!
+          : (data['is_liked_by_user'] == true);
+
+      currentCount = _postLikes.containsKey(index)
+          ? _postLikes[index]!
+          : (data['like_count'] ?? 0);
+    } catch (e) {
+      debugPrint('Error parsing post for like: $e');
+      return;
+    }
+
+    if (postId == null) return;
+
+    final bool newLiked = !currentLiked;
+    final int newCount = currentCount + (newLiked ? 1 : -1);
+
+    // Optimistic update
+    setState(() {
+      _likedPosts[index] = newLiked;
+      _postLikes[index] = newCount;
+    });
+
+    // Notify
+    PostState().updatePost(postId, newCount, newLiked);
+
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
+
+      if (token == null || userId == null) return;
+
+      final uri = Uri.parse('$base/user/toggle/$postId/$userId');
+      final resp = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      bool updated = false;
+      int finalCount = newCount;
+      bool finalLiked = newLiked;
+
+      debugPrint('=== LIKE TOGGLE API RESPONSE ===');
+      debugPrint('Status Code: ${resp.statusCode}');
+      debugPrint('Response Body: ${resp.body}');
+
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body);
+        final data = body['data'] ?? body;
+
+        debugPrint('Parsed data: $data');
+
+        // MATCHING HOME SCREEN LOGIC ORDER
+        if (data['like_count'] != null) {
+          finalCount = data['like_count'];
+          updated = true;
+          debugPrint('Updated count from like_count: $finalCount');
+        }
+
+        // Check for explicit status first
+        if (data['is_liked'] != null ||
+            data['liked'] != null ||
+            data['is_liked'] != null) {
+          finalLiked =
+              (data['is_liked'] ?? data['liked'] ?? data['is_liked']) == true;
+          updated = true;
+          debugPrint('Updated liked status: $finalLiked');
+
+          // If likers list is also there, update count from it
+          if (data['likers'] != null && data['likers'] is List) {
+            finalCount = (data['likers'] as List).length;
+            debugPrint('Updated count from likers list: $finalCount');
+          }
+        } else if (data['likers'] != null && data['likers'] is List) {
+          final likers = List<dynamic>.from(data['likers']);
+          // Override count with likers length
+          finalCount = likers.length;
+          updated = true;
+          debugPrint('Count from likers (no explicit status): $finalCount');
+
+          final String uidStr = userId.toString();
+          finalLiked = likers.any((l) {
+            if (l is Map) {
+              return l['user_id']?.toString() == uidStr ||
+                  l['id']?.toString() == uidStr;
+            }
+            return l.toString() == uidStr;
+          });
+          debugPrint('Liked status from likers check: $finalLiked');
+        }
+
+        debugPrint(
+          'Final values - Count: $finalCount, Liked: $finalLiked, Updated: $updated',
+        );
+
+        if (updated) {
+          debugPrint(
+            'Updating UI state for index $index with count: $finalCount, liked: $finalLiked',
+          );
+          setState(() {
+            _postLikes[index] = finalCount;
+            _likedPosts[index] = finalLiked;
+          });
+          debugPrint(
+            'State updated. New values - _postLikes[$index]: ${_postLikes[index]}, _likedPosts[$index]: ${_likedPosts[index]}',
+          );
+          PostState().updatePost(postId, finalCount, finalLiked);
+        } else {
+          debugPrint('WARNING: No update flag set, keeping optimistic values');
+        }
+      } else {
+        debugPrint('API call failed with status: ${resp.statusCode}');
+        // Revert
+        if (mounted) {
+          setState(() {
+            _likedPosts[index] = currentLiked;
+            _postLikes[index] = currentCount;
+          });
+          PostState().updatePost(postId, currentCount, currentLiked);
+        }
+      }
+    } catch (e) {
+      // Revert
+      if (mounted) {
+        setState(() {
+          _likedPosts[index] = currentLiked;
+          _postLikes[index] = currentCount;
+        });
+        PostState().updatePost(postId, currentCount, currentLiked);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _postUpdateSubscription?.cancel();
+    super.dispose();
   }
 }
