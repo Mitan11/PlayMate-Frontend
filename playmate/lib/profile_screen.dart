@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,7 +9,6 @@ import 'package:playmate/create_post_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
-import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,8 +31,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   List<Map<String, dynamic>> _availableSports = [];
   bool _isLoadingProfile = true;
   List<String> _userPosts = [];
-  Map<int, bool> _likedPosts = {};
-  Map<int, int> _postLikes = {};
+
+  // StreamSubscription? _postUpdateSubscription;
 
   final Map<String, IconData> _sportIcons = {
     'Football': Icons.sports_soccer,
@@ -56,12 +56,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     _loadUserSports();
     _loadAvailableSports();
     _loadUserPosts();
-  }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+    // _postUpdateSubscription logic removed
   }
 
   Future<void> _loadUserProfile() async {
@@ -266,6 +262,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               'caption': p['text_content'] ?? '',
               'media_url': p['media_url'] ?? '', // Store full URL from API
               'timestamp': p['created_at'] ?? DateTime.now().toIso8601String(),
+              'like_count': p['like_count'] ?? p['likes_count'] ?? 0,
+              'is_liked_by_user': p['is_liked_by_user'] ?? false,
             };
             return jsonEncode(local);
           }).toList();
@@ -274,6 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           if (mounted) {
             setState(() {
               _userPosts = localPosts;
+              // Like syncing removed as requested
             });
           }
         } else {
@@ -1163,36 +1162,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                   // Engagement section
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _toggleLike(index),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _likedPosts[index] == true
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              size: 20,
-                              color: _likedPosts[index] == true
-                                  ? Colors.red
-                                  : Colors.grey.shade500,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${_postLikes[index] ?? (index * 3 + 5)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: _likedPosts[index] == true
-                                    ? Colors.red
-                                    : Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  // Removed like button as requested
                 ],
               ),
             ),
@@ -1200,18 +1170,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ),
     );
-  }
-
-  void _toggleLike(int index) {
-    setState(() {
-      if (_likedPosts[index] == true) {
-        _likedPosts[index] = false;
-        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) - 1;
-      } else {
-        _likedPosts[index] = true;
-        _postLikes[index] = (_postLikes[index] ?? (index * 3 + 5)) + 1;
-      }
-    });
   }
 
   Future<void> _deletePostAtIndex(int index) async {
@@ -1254,13 +1212,63 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (confirmed == true) {
       try {
+        final base = dotenv.env['BASE_URL'] ?? '';
         final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token');
         final userId = prefs.getString('user_id');
-        if (userId != null) {
-          final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
-          if (index >= 0 && index < currentPosts.length) {
-            currentPosts.removeAt(index);
-            await prefs.setStringList('user_posts_$userId', currentPosts);
+
+        if (token == null || userId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Authentication required'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        if (index >= 0 && index < _userPosts.length) {
+          final postJson = _userPosts[index];
+          String? postId;
+          try {
+            final Map<String, dynamic> postMap = jsonDecode(postJson);
+            postId = postMap['post_id']?.toString();
+          } catch (e) {
+            debugPrint('Error parsing post data: $e');
+          }
+
+          if (postId == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invalid post data'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          final uri = Uri.parse('$base/user/deletePost/$postId/$userId');
+          final resp = await http.delete(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+          );
+
+          debugPrint('Delete post API response: ${resp.statusCode}');
+
+          if (resp.statusCode == 200) {
+            // Remove from local list immediately for UI responsiveness
+            setState(() {
+              _userPosts.removeAt(index);
+            });
+
+            // Also try to remove from SharedPreferences to keep it consistent (optional but good)
+            final userId = prefs.getString('user_id');
+            if (userId != null) {
+              // We will just rely on _loadUserPosts() eventually consistent.
+            }
             _loadUserPosts();
 
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1272,14 +1280,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                 backgroundColor: Colors.green,
               ),
             );
+          } else {
+            final errorData = jsonDecode(resp.body);
+            final errorMessage =
+                errorData['message'] ?? 'Failed to delete post';
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         }
       } catch (e) {
+        debugPrint('Error deleting post: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting post: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -1573,5 +1590,12 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
     );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    // _postUpdateSubscription?.cancel();
+    super.dispose();
   }
 }
