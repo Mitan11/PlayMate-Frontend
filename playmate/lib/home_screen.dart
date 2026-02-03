@@ -12,6 +12,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 import 'dart:developer';
 
+import 'package:playmate/post_state.dart';
+
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
   const HomeScreen({super.key, this.initialIndex = 0});
@@ -43,11 +45,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserData();
     _loadRecentActivities();
 
-    // _postUpdateSubscription = PostState().onPostUpdate.listen((update) {
-    //   if (!mounted) return;
-    //   // ...
-    //   // Removing PostState logic as requested
-    // });
+    _postUpdateSubscription = PostState().onPostUpdate.listen((update) {
+      if (!mounted) return;
+
+      final index = _recentActivities.indexWhere(
+        (a) => a['post_id'] == update.postId,
+      );
+      if (index != -1) {
+        setState(() {
+          _recentActivities[index]['likes_count'] = update.likeCount;
+          _recentActivities[index]['is_liked_by_user'] = update.isLiked;
+        });
+      }
+    });
   }
 
   @override
@@ -391,7 +401,9 @@ class _HomeScreenState extends State<HomeScreen> {
         activity['user']?['profile_image'] ?? activity['profile_image'] ?? '';
     final String text = activity['text_content'] ?? activity['caption'] ?? '';
     final String? mediaUrl = activity['media_url'];
-    // Assuming user reverted to 'likes_count'
+
+    final int likes = activity['likes_count'] ?? activity['like_count'] ?? 0;
+    final bool isLiked = activity['is_liked_by_user'] == true;
 
     String timeAgo = 'Just now';
     if (activity['created_at'] != null) {
@@ -487,12 +499,150 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => _togglePostLike(index),
+                  borderRadius: BorderRadius.circular(50),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          size: 20,
+                          color: isLiked ? Colors.red : Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$likes',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: isLiked ? Colors.red : Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _togglePostLike(int index) async {
+    final activity = _recentActivities[index];
+    final postId = activity['post_id'];
+
+    if (postId == null) return;
+
+    // Optimistic UI update
+    setState(() {
+      final bool isLiked = activity['is_liked_by_user'] == true;
+      activity['is_liked_by_user'] = !isLiked;
+      // Handle both keys
+      int current = activity['likes_count'] ?? activity['like_count'] ?? 0;
+      activity['likes_count'] = current + (isLiked ? -1 : 1);
+    });
+
+    final int newCount = activity['likes_count'];
+    final bool newLiked = activity['is_liked_by_user'];
+
+    // Notify others
+    PostState().updatePost(postId, newCount, newLiked);
+
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
+
+      if (token == null || userId == null) return;
+
+      final uri = Uri.parse('$base/user/toggle/$postId/$userId');
+      final resp = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body);
+        final data = body['data'] ?? body;
+
+        int finalCount = newCount;
+        bool finalLiked = newLiked;
+        bool updated = false;
+
+        if (data['like_count'] != null) {
+          finalCount = data['like_count'];
+          updated = true;
+        }
+
+        // Check for explicit status first
+        if (data['is_liked_by_user'] != null || data['liked'] != null) {
+          finalLiked = (data['is_liked_by_user'] ?? data['liked']) == true;
+          updated = true;
+
+          // If likers list is also there, update count from it
+          if (data['likers'] != null && data['likers'] is List) {
+            finalCount = (data['likers'] as List).length;
+          }
+        } else if (data['likers'] != null && data['likers'] is List) {
+          final likers = List<dynamic>.from(data['likers']);
+          // Override count with likers length
+          finalCount = likers.length;
+          updated = true;
+
+          final String uidStr = userId.toString();
+          finalLiked = likers.any((l) {
+            if (l is Map) {
+              return l['user_id']?.toString() == uidStr ||
+                  l['id']?.toString() == uidStr;
+            }
+            return l.toString() == uidStr;
+          });
+        }
+
+        if (updated) {
+          setState(() {
+            activity['likes_count'] = finalCount;
+            activity['is_liked_by_user'] = finalLiked;
+          });
+          PostState().updatePost(postId, finalCount, finalLiked);
+        }
+      } else {
+        // Revert if failed
+        setState(() {
+          final bool isLiked = activity['is_liked_by_user'] == true;
+          activity['is_liked_by_user'] = !isLiked;
+          activity['likes_count'] =
+              (activity['likes_count'] ?? 0) + (!isLiked ? 1 : -1);
+        });
+
+        final int revertedCount = activity['likes_count'];
+        final bool revertedLiked = activity['is_liked_by_user'];
+        PostState().updatePost(postId, revertedCount, revertedLiked);
+
+        debugPrint('Failed to toggle like: ${resp.body}');
+      }
+    } catch (e) {
+      debugPrint('Error toggling like: $e');
+      // Revert if error
+      if (mounted) {
+        setState(() {
+          final bool isLiked = activity['is_liked_by_user'] == true;
+          activity['is_liked_by_user'] = !isLiked; // Revert back
+          activity['likes_count'] =
+              (activity['likes_count'] ?? 0) + (isLiked ? -1 : 1);
+        });
+      }
+    }
   }
 
   Widget _buildPlaceholder() {

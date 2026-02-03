@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:convert';
+import 'dart:async';
+import 'package:playmate/post_state.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final File? imageFile;
   final int postIndex;
   final String? caption;
   final String? textContent;
+  final int? postId;
 
   const PostDetailScreen({
     super.key,
@@ -15,6 +21,7 @@ class PostDetailScreen extends StatefulWidget {
     required this.postIndex,
     this.caption,
     this.textContent,
+    this.postId,
   });
 
   @override
@@ -27,39 +34,182 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   // ignore: unused_field
   bool _isLoading = true;
   final Color themeColor = const Color(0xFF2E7D32);
+  StreamSubscription? _postUpdateSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadPostData();
+    _setupPostStateSubscription();
+  }
+
+  @override
+  void dispose() {
+    _postUpdateSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _setupPostStateSubscription() {
+    if (widget.postId == null) return;
+
+    _postUpdateSubscription = PostState().onPostUpdate.listen((update) {
+      if (!mounted) return;
+      if (update.postId == widget.postId) {
+        setState(() {
+          _likeCount = update.likeCount;
+          _isLiked = update.isLiked;
+        });
+      }
+    });
   }
 
   Future<void> _loadPostData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String identifier =
-        widget.imageFile?.path ?? widget.textContent ?? '';
+    if (widget.postId == null) {
+      // Fallback to local storage if no postId (legacy behavior or local posts)
+      final prefs = await SharedPreferences.getInstance();
+      final String identifier =
+          widget.imageFile?.path ?? widget.textContent ?? '';
 
-    setState(() {
-      _isLiked = prefs.getBool('liked_$identifier') ?? false;
-      _likeCount =
-          prefs.getInt('likes_count_$identifier') ??
-          (15 + (identifier.hashCode % 100));
-      _isLoading = false;
-    });
+      if (mounted) {
+        setState(() {
+          _isLiked = prefs.getBool('liked_$identifier') ?? false;
+          _likeCount =
+              prefs.getInt('likes_count_$identifier') ??
+              (15 + (identifier.hashCode % 100));
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    // Attempt to load from API if possible, otherwise rely on optimistic/passed data
+    // For now, we will just set loading to false as we don't have a specific "get single post" logic ready
+    // that returns like status without user ID context easily.
+    // We assume the caller might have fresh data or PostState will sync it.
+    // Ideally we would fetch: GET /post/:postId -> but we need user context for isLiked.
+
+    setState(() => _isLoading = false);
   }
 
   Future<void> _toggleLike() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String identifier =
-        widget.imageFile?.path ?? widget.textContent ?? '';
+    if (widget.postId == null) {
+      // Legacy local toggle
+      final prefs = await SharedPreferences.getInstance();
+      final String identifier =
+          widget.imageFile?.path ?? widget.textContent ?? '';
 
+      setState(() {
+        _isLiked = !_isLiked;
+        _likeCount = _isLiked ? _likeCount + 1 : _likeCount - 1;
+      });
+
+      await prefs.setBool('liked_$identifier', _isLiked);
+      await prefs.setInt('likes_count_$identifier', _likeCount);
+      return;
+    }
+
+    final int postId = widget.postId!;
+    final bool currentLiked = _isLiked;
+    final int currentCount = _likeCount;
+
+    final bool newLiked = !currentLiked;
+    final int newCount = currentCount + (newLiked ? 1 : -1);
+
+    // Optimistic update
     setState(() {
-      _isLiked = !_isLiked;
-      _likeCount = _isLiked ? _likeCount + 1 : _likeCount - 1;
+      _isLiked = newLiked;
+      _likeCount = newCount;
     });
 
-    await prefs.setBool('liked_$identifier', _isLiked);
-    await prefs.setInt('likes_count_$identifier', _likeCount);
+    PostState().updatePost(postId, newCount, newLiked);
+
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
+
+      if (token == null || userId == null) return;
+
+      final uri = Uri.parse('$base/user/toggle/$postId/$userId');
+      final resp = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      bool updated = false;
+      int finalCount = newCount;
+      bool finalLiked = newLiked;
+
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body);
+        final data = body['data'] ?? body;
+
+        // Check for explicit status first
+        if (data['is_liked_by_user'] != null ||
+            data['liked'] != null ||
+            data['is_liked'] != null) {
+          finalLiked =
+              (data['is_liked_by_user'] ?? data['liked'] ?? data['is_liked']) ==
+              true;
+          updated = true;
+
+          if (data['likers'] != null && data['likers'] is List) {
+            finalCount = (data['likers'] as List).length;
+          } else if (data['like_count'] != null) {
+            finalCount = data['like_count'];
+          }
+        } else if (data['likers'] != null && data['likers'] is List) {
+          final likers = List<dynamic>.from(data['likers']);
+          // Override count with likers length
+          finalCount = likers.length;
+          updated = true;
+
+          final String uidStr = userId.toString();
+          finalLiked = likers.any((l) {
+            if (l is Map) {
+              return l['user_id']?.toString() == uidStr ||
+                  l['id']?.toString() == uidStr;
+            }
+            return l.toString() == uidStr;
+          });
+        } else if (data['like_count'] != null) {
+          finalCount = data['like_count'];
+          updated = true;
+        }
+
+        if (updated) {
+          setState(() {
+            _likeCount = finalCount;
+            _isLiked = finalLiked;
+          });
+          PostState().updatePost(postId, finalCount, finalLiked);
+        }
+      } else {
+        // Revert
+        if (mounted) {
+          setState(() {
+            _isLiked = currentLiked;
+            _likeCount = currentCount;
+          });
+          PostState().updatePost(postId, currentCount, currentLiked);
+        }
+        debugPrint('Failed to toggle like: ${resp.body}');
+      }
+    } catch (e) {
+      debugPrint('Error toggling like: $e');
+      // Revert
+      if (mounted) {
+        setState(() {
+          _isLiked = currentLiked;
+          _likeCount = currentCount;
+        });
+        PostState().updatePost(postId, currentCount, currentLiked);
+      }
+    }
   }
 
   Future<void> _deletePost(BuildContext context) async {
@@ -101,27 +251,68 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
 
     if (confirmed == true && context.mounted) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final userId = prefs.getString('user_id');
-        if (userId != null) {
-          final currentPosts = prefs.getStringList('user_posts_$userId') ?? [];
-          if (widget.postIndex >= 0 && widget.postIndex < currentPosts.length) {
-            currentPosts.removeAt(widget.postIndex);
-            await prefs.setStringList('user_posts_$userId', currentPosts);
-
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Post deleted successfully',
-                    style: GoogleFonts.poppins(),
+      if (widget.postId == null) {
+        // Fallback to old shared prefs logic if no postId
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final userId = prefs.getString('user_id');
+          if (userId != null) {
+            final currentPosts =
+                prefs.getStringList('user_posts_$userId') ?? [];
+            if (widget.postIndex >= 0 &&
+                widget.postIndex < currentPosts.length) {
+              currentPosts.removeAt(widget.postIndex);
+              await prefs.setStringList('user_posts_$userId', currentPosts);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Post deleted successfully'),
+                    backgroundColor: Colors.green,
                   ),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              Navigator.pop(context, true); // Return true to indicate deletion
+                );
+                Navigator.pop(context, true);
+              }
             }
+          }
+        } catch (e) {}
+        return;
+      }
+
+      try {
+        final base = dotenv.env['BASE_URL'] ?? '';
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token');
+        final userId = prefs.getString('user_id');
+
+        if (token == null || userId == null) return;
+
+        final uri = Uri.parse('$base/user/deletePost/${widget.postId}/$userId');
+        final resp = await http.delete(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+
+        if (resp.statusCode == 200) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Post deleted successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.pop(context, true);
+          }
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to delete post'),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         }
       } catch (e) {
