@@ -300,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today_outlined),
               activeIcon: Icon(Icons.calendar_today),
-              label: 'Booking',
+              label: 'Venue',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
