@@ -268,19 +268,19 @@ class _ProfileScreenState extends State<ProfileScreen>
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        final postsWrapper = data['data']?['posts'];
+        final postsList = data['data']?['posts'];
 
-        if (postsWrapper != null && postsWrapper['posts'] != null) {
-          final apiPosts = List<Map<String, dynamic>>.from(
-            postsWrapper['posts'],
-          );
+        if (postsList != null && postsList is List) {
+          final apiPosts = List<Map<String, dynamic>>.from(postsList);
 
           // Convert API posts to local storage format (JSON strings)
           final List<String> localPosts = apiPosts.map((p) {
             // Determine the actual like status from API
+            // API response may not include is_liked_by_user, so default to false
             final bool isLiked =
-                (p['is_liked_by_user'] ?? p['liked'] ?? p['is_liked']) == true;
-            final int likeCount = p['like_count'] ?? p['likes_count'] ?? 0;
+                (p['is_liked_by_user'] ?? p['is_liked'] ?? p['liked']) == true;
+            // Use like_count from API (the actual field name)
+            final int likeCount = p['like_count'] ?? 0;
 
             final Map<String, dynamic> local = {
               'post_id': p['post_id'],
@@ -304,13 +304,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                 final p = apiPosts[i];
                 // Check all possible like status keys
                 _likedPosts[i] =
-                    (p['is_liked_by_user'] ?? p['liked'] ?? p['is_liked']) ==
+                    (p['is_liked_by_user'] ?? p['is_liked'] ?? p['liked']) ==
                     true;
-                _postLikes[i] = p['like_count'] ?? p['likes_count'] ?? 0;
+                // Use like_count from API (the actual field name)
+                _postLikes[i] = p['like_count'] ?? 0;
               }
 
               debugPrint(
-                'Loaded ${_userPosts.length} posts with like states: $_likedPosts',
+                'Loaded ${_userPosts.length} posts with like states: $_likedPosts and like counts: $_postLikes',
               );
             });
           }
@@ -1023,6 +1024,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     String? textContent;
     String timestamp = 'now';
     int? postId;
+    String? createdAt;
 
     try {
       if (postItem.trim().startsWith('{')) {
@@ -1033,6 +1035,16 @@ class _ProfileScreenState extends State<ProfileScreen>
         postId = data['post_id'] is int
             ? data['post_id']
             : int.tryParse(data['post_id'].toString());
+        createdAt = data['timestamp'];
+
+        // Ensure like count and status are available from stored data
+        if (_likedPosts[index] == null) {
+          _likedPosts[index] =
+              data['is_liked_by_user'] ?? data['is_liked'] ?? false;
+        }
+        if (_postLikes[index] == null) {
+          _postLikes[index] = data['like_count'] ?? 0;
+        }
 
         // Calculate time ago
         if (data['timestamp'] != null) {
@@ -1069,6 +1081,11 @@ class _ProfileScreenState extends State<ProfileScreen>
               caption: caption,
               textContent: textContent,
               postId: postId,
+              initialLikeCount: _postLikes[index] ?? 0,
+              initialIsLiked: _likedPosts[index] ?? false,
+              userName: '$_firstName $_lastName',
+              profileImage: _profileImage,
+              createdAt: createdAt,
             ),
           ),
         );
@@ -1695,10 +1712,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           ? data['post_id']
           : int.tryParse(data['post_id'].toString());
 
-      // Check local state map, fallback to parsed data
+      // Check local state map, fallback to parsed data - match home_screen keys
       currentLiked = _likedPosts.containsKey(index)
           ? _likedPosts[index]!
-          : (data['is_liked_by_user'] == true);
+          : (data['is_liked_by_user'] ?? data['is_liked'] ?? false);
 
       currentCount = _postLikes.containsKey(index)
           ? _postLikes[index]!
@@ -1753,19 +1770,20 @@ class _ProfileScreenState extends State<ProfileScreen>
 
         debugPrint('Parsed data: $data');
 
-        // MATCHING HOME SCREEN LOGIC ORDER
+        // MATCHING HOME SCREEN LOGIC ORDER - check like_count first
         if (data['like_count'] != null) {
           finalCount = data['like_count'];
           updated = true;
           debugPrint('Updated count from like_count: $finalCount');
         }
 
-        // Check for explicit status first
-        if (data['is_liked'] != null ||
+        // Check for explicit status first - match home_screen key order
+        if (data['is_liked_by_user'] != null ||
             data['liked'] != null ||
             data['is_liked'] != null) {
           finalLiked =
-              (data['is_liked'] ?? data['liked'] ?? data['is_liked']) == true;
+              (data['is_liked_by_user'] ?? data['liked'] ?? data['is_liked']) ==
+              true;
           updated = true;
           debugPrint('Updated liked status: $finalLiked');
 
