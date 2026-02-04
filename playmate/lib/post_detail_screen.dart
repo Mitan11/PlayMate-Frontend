@@ -14,6 +14,11 @@ class PostDetailScreen extends StatefulWidget {
   final String? caption;
   final String? textContent;
   final int? postId;
+  final int? initialLikeCount;
+  final bool? initialIsLiked;
+  final String? userName;
+  final String? profileImage;
+  final String? createdAt;
 
   const PostDetailScreen({
     super.key,
@@ -22,6 +27,11 @@ class PostDetailScreen extends StatefulWidget {
     this.caption,
     this.textContent,
     this.postId,
+    this.initialLikeCount,
+    this.initialIsLiked,
+    this.userName,
+    this.profileImage,
+    this.createdAt,
   });
 
   @override
@@ -63,6 +73,25 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     });
   }
 
+  String _getTimeAgo(String? createdAt) {
+    if (createdAt == null) return 'now';
+    try {
+      final postTime = DateTime.parse(createdAt);
+      final difference = DateTime.now().difference(postTime);
+      if (difference.inDays > 0) {
+        return '${difference.inDays}d';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours}h';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes}m';
+      } else {
+        return 'now';
+      }
+    } catch (e) {
+      return 'now';
+    }
+  }
+
   Future<void> _loadPostData() async {
     if (widget.postId == null) {
       // Fallback to local storage if no postId (legacy behavior or local posts)
@@ -82,13 +111,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       return;
     }
 
-    // Attempt to load from API if possible, otherwise rely on optimistic/passed data
-    // For now, we will just set loading to false as we don't have a specific "get single post" logic ready
-    // that returns like status without user ID context easily.
-    // We assume the caller might have fresh data or PostState will sync it.
-    // Ideally we would fetch: GET /post/:postId -> but we need user context for isLiked.
-
-    setState(() => _isLoading = false);
+    // Initialize with passed data from caller
+    if (mounted) {
+      setState(() {
+        _isLiked = widget.initialIsLiked ?? false;
+        _likeCount = widget.initialLikeCount ?? 0;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _toggleLike() async {
@@ -401,14 +431,23 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       CircleAvatar(
                         radius: 24,
                         backgroundColor: themeColor.withOpacity(0.1),
-                        child: Icon(Icons.person, color: themeColor, size: 24),
+                        backgroundImage:
+                            widget.profileImage != null &&
+                                widget.profileImage!.isNotEmpty
+                            ? NetworkImage(widget.profileImage!)
+                            : null,
+                        child:
+                            widget.profileImage == null ||
+                                widget.profileImage!.isEmpty
+                            ? Icon(Icons.person, color: themeColor, size: 24)
+                            : null,
                       ),
                       const SizedBox(width: 12),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'You',
+                            widget.userName ?? 'You',
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
@@ -416,7 +455,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             ),
                           ),
                           Text(
-                            '${DateTime.now().difference(DateTime.now().subtract(const Duration(hours: 2))).inHours}h',
+                            _getTimeAgo(widget.createdAt),
                             style: GoogleFonts.poppins(
                               fontSize: 13,
                               color: Colors.grey.shade600,
