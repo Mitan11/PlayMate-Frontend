@@ -1,5 +1,5 @@
 import axios from "axios";
-import { createContext, useState } from "react"
+import { createContext, useMemo, useState } from "react"
 
 export const AppContext = createContext()
 
@@ -8,6 +8,12 @@ const AppContextProvider = (props) => {
     const [token, setToken] = useState(localStorage.getItem("token") ? localStorage.getItem("token") : false);
     const [venueOwner, setVenueOwner] = useState(localStorage.getItem("venue_owner") ? JSON.parse(localStorage.getItem("venue_owner")) : null);
     console.log("Venue Owner from context:", venueOwner);
+
+    // Check if profile is incomplete
+    const isProfileIncomplete = useMemo(() => {
+        return !venueOwner?.venue_name || !venueOwner?.address ||
+            venueOwner?.venue_name === "" || venueOwner?.address === "" || venueOwner?.images.length === 0;
+    }, [venueOwner]);
 
     const getVenueSpots = async (setSports, setLoading) => {
         setLoading(true);
@@ -37,7 +43,8 @@ const AppContextProvider = (props) => {
         venueOwner,
         setVenueOwner,
         backendUrl,
-        getVenueSpots
+        getVenueSpots,
+        isProfileIncomplete
     }
 
     return (

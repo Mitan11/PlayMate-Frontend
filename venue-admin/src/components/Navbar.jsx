@@ -30,7 +30,7 @@ function Navbar() {
             localStorage.removeItem("venue_owner");
             toast.success("Logout successful");
             setAnchorEl(null);
-            navigate("/");
+            navigate("/login");
         }
     };
 

@@ -64,6 +64,7 @@ export default function App() {
             </Box>
         ) : (
             <Routes>
+                <Route path="/" element={<Navigate to="/login" />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<RegisterForm />} />
                 <Route path="*" element={<NotFound />} />

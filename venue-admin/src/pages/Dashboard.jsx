@@ -14,7 +14,7 @@ import Preloader from "../components/Preloader";
 import { FaInfoCircle, FaTimes } from "react-icons/fa";
 
 function Dashboard() {
-    const { venueOwner, backendUrl, token } = useContext(AppContext);
+    const { venueOwner, backendUrl, token, isProfileIncomplete } = useContext(AppContext);
     const [loading, setLoading] = useState(true);
     const [showProfileAlert, setShowProfileAlert] = useState(true);
     const [stats, setStats] = useState({
@@ -27,12 +27,6 @@ function Dashboard() {
     const [recentBookings, setRecentBookings] = useState([]);
 
     const navigate = useNavigate();
-
-    // Check if profile is incomplete
-    const isProfileIncomplete = useMemo(() => {
-        return !venueOwner?.venue_name || !venueOwner?.address || 
-               venueOwner?.venue_name === "" || venueOwner?.address === "";
-    }, [venueOwner]);
 
     // Fetch dashboard stats
     const fetchDashboardStats = useCallback(async () => {
