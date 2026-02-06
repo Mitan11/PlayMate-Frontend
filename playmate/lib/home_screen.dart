@@ -256,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     : 'All Games',
               );
             case 2:
-              return const VenueSelectionScreen();
+              return const BookingScreen();
             case 3:
               return const ProfileScreen();
             default:
