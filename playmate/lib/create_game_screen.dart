@@ -5,17 +5,20 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:playmate/payment_summary_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CreateGameScreen extends StatefulWidget {
   final String? initialArea;
   final String? venueName;
   final String? price;
+  final String? venueId;
 
   const CreateGameScreen({
     super.key,
     this.initialArea,
     this.venueName,
     this.price,
+    this.venueId,
   });
 
   @override
@@ -39,8 +42,9 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   late TextEditingController _areaController;
   final TextEditingController _playersController = TextEditingController();
 
-  // Dummy Slots
-  final List<String> _slots = ['6:00 to 7:00', '7:00 to 8:00', '8:00 to 9:00'];
+  // Slots
+  List<String> _slots = [];
+  bool _isLoadingSlots = false;
 
   @override
   void initState() {
@@ -70,6 +74,87 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
       debugPrint('Error loading sports: $e');
     } finally {
       setState(() => _isLoadingSports = false);
+    }
+  }
+
+  Future<void> _fetchAvailableSlots() async {
+    debugPrint('--- _fetchAvailableSlots Called ---');
+    debugPrint(
+      'Values -> VenueId: ${widget.venueId}, SportId: $_selectedSportId, Date: $_selectedDate',
+    );
+
+    if (_selectedSportId == null || widget.venueId == null) {
+      debugPrint('WARNING: Missing venueId or sportId. Aborting slot fetch.');
+      return;
+    }
+
+    setState(() {
+      _isLoadingSlots = true;
+      _slots = [];
+      _selectedSlot = null;
+    });
+
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final dateStr =
+          "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+
+      final uri = Uri.parse(
+        '$base/venue/slots/available/${widget.venueId}?date=$dateStr&sportId=$_selectedSportId',
+      );
+
+      debugPrint('Fetching Slots URL: $uri');
+
+      final resp = await http.get(
+        uri,
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      );
+
+      debugPrint('Slots Response Code: ${resp.statusCode}');
+      debugPrint('Slots Response Body: ${resp.body}');
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data['status'] == true && data['data'] != null) {
+          final slotsData = List<dynamic>.from(data['data']);
+
+          setState(() {
+            _slots = slotsData
+                .map((e) {
+                  if (e is String) return e;
+                  if (e is Map) {
+                    final start = e['start_time']?.toString();
+                    final end = e['end_time']?.toString();
+                    if (start != null && end != null) {
+                      // Format "09:00:00" -> "09:00"
+                      final s = start.length >= 5
+                          ? start.substring(0, 5)
+                          : start;
+                      final e = end.length >= 5 ? end.substring(0, 5) : end;
+                      return '$s to $e';
+                    }
+                    return e['slot_time']?.toString() ??
+                        e['time']?.toString() ??
+                        e.toString();
+                  }
+                  return e.toString();
+                })
+                .toList()
+                .cast<String>();
+          });
+        } else {
+          debugPrint('API status false or data null: ${data['message']}');
+        }
+      } else {
+        debugPrint('Failed to load slots: ${resp.body}');
+      }
+    } catch (e) {
+      debugPrint('Error loading slots: $e');
+    } finally {
+      setState(() => _isLoadingSlots = false);
     }
   }
 
@@ -142,6 +227,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                             setState(() {
                               _selectedSportId = val;
                             });
+                            _fetchAvailableSlots();
                           },
                         ),
                       ),
@@ -222,6 +308,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                             onTap: () {
                               setState(() {
                                 _selectedDate = date;
+                                _fetchAvailableSlots();
                               });
                             },
                             child: Container(
@@ -294,41 +381,66 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                     Wrap(
                       spacing: 12,
                       runSpacing: 12,
-                      children: _slots.map((slot) {
-                        final isSelected = _selectedSlot == slot;
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedSlot = slot;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected ? themeColor : Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected
-                                    ? themeColor
-                                    : Colors.grey.shade300,
+                      children: _isLoadingSlots
+                          ? [
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20.0),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              slot,
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.black87,
+                            ]
+                          : _slots.isEmpty
+                          ? [
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  'No slots available',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.grey,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                            ]
+                          : _slots.map((slot) {
+                              final isSelected = _selectedSlot == slot;
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedSlot = slot;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? themeColor
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? themeColor
+                                          : Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    slot,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                     ),
                   ],
                 ),
@@ -375,7 +487,8 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                         builder: (context) => PaymentSummaryScreen(
                           venueName: widget.venueName ?? 'Unknown Venue',
                           sportName: selectedSport['sport_name'],
-                          date: _selectedDate.toIso8601String().split('T')[0],
+                          date:
+                              "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}",
                           time: _selectedSlot!,
                           courtPrice: courtPrice,
                           totalPlayers: _playersController.text.isNotEmpty

@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:playmate/venue_selection_screen.dart';
+import 'package:playmate/booking_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:playmate/manage_game_screen.dart';
 
@@ -212,7 +212,7 @@ class _PlayScreenState extends State<PlayScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const VenueSelectionScreen(),
+                    builder: (context) => const BookingScreen(),
                   ),
                 );
               },
