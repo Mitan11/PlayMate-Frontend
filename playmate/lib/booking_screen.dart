@@ -52,6 +52,9 @@ class _BookingScreenState extends State<BookingScreen> {
   // Map to store price for each slot
   Map<String, double> _slotPrices = {};
 
+  // Map to store slot_id for each slot
+  Map<String, int> _slotIds = {};
+
   // Price Data
   double _courtPrice = 0.0;
   double _convenienceFee = 0.0;
@@ -196,12 +199,14 @@ class _BookingScreenState extends State<BookingScreen> {
           setState(() {
             _slots = [];
             _slotPrices = {}; // Clear previous prices
+            _slotIds = {}; // Clear previous slot IDs
 
             for (var e in slotsData) {
               if (e is Map) {
                 final start = e['start_time']?.toString();
                 final end = e['end_time']?.toString();
                 final priceData = e['price_per_slot'];
+                final slotId = e['slot_id'];
 
                 if (start != null && end != null) {
                   // Format "09:00:00" -> "09:00"
@@ -222,6 +227,14 @@ class _BookingScreenState extends State<BookingScreen> {
                     debugPrint(
                       'Slot: $slotTime -> Price: $price (from API: $priceData)',
                     );
+                  }
+
+                  // Store slot_id for this slot
+                  if (slotId != null) {
+                    final id = (slotId is int)
+                        ? slotId
+                        : int.tryParse(slotId.toString()) ?? 0;
+                    _slotIds[slotTime] = id;
                   }
                 }
               } else if (e is String) {
@@ -844,61 +857,162 @@ class _BookingScreenState extends State<BookingScreen> {
                       orElse: () => {'sport_name': 'Unknown'},
                     );
 
-                    // Save Game to SharedPreferences
-                    final prefs = await SharedPreferences.getInstance();
-                    final sportName = selectedSport['sport_name'] ?? 'Unknown';
-                    final dateStr =
-                        "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}";
-                    final totalPlayers = _playersController.text.isNotEmpty
-                        ? _playersController.text
-                        : '4';
+                    try {
+                      // Get auth token and user ID
+                      final prefs = await SharedPreferences.getInstance();
+                      final token = prefs.getString('auth_token');
 
-                    final newGame = {
-                      'sport': sportName,
-                      'image': '',
-                      'title': '$sportName Match',
-                      'location': _currentVenueName ?? 'Unknown Venue',
-                      'distance': '0.0 km',
-                      'players': '1/$totalPlayers',
-                      'level': 'Open',
-                      'date': dateStr,
-                      'time': _selectedSlot!,
-                      'isJoined': false,
-                      'isCreated': true,
-                    };
+                      // Try to get user_id as int first, then as string
+                      String? userId = prefs.getString('user_id');
+                      
+                      if (token == null || userId == null) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please login to continue'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
 
-                    final String? existingGamesString = prefs.getString(
-                      'created_games',
-                    );
-                    List<dynamic> existingGames = [];
-                    if (existingGamesString != null) {
-                      existingGames = jsonDecode(existingGamesString);
+                      // Get slot_id for the selected slot
+                      final slotId = _slotIds[_selectedSlot] ?? 0;
+
+                      // Format datetime for API (YYYY-MM-DD HH:MM:SS)
+                      final dateStr =
+                          "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+
+                      // Extract start and end time from selected slot (e.g., "07:00 to 08:00")
+                      final slotParts = _selectedSlot!.split(' to ');
+                      final startTime = slotParts.isNotEmpty
+                          ? slotParts[0]
+                          : '00:00';
+                      final endTime = slotParts.length > 1
+                          ? slotParts[1]
+                          : '00:00';
+
+                      final startDatetime = '$dateStr $startTime:00';
+                      final endDatetime = '$dateStr $endTime:00';
+
+                      // Prepare booking data
+                      final bookingData = {
+                        'sport_id': int.parse(_selectedSportId!),
+                        'venue_id': int.parse(_currentVenueId!),
+                        'start_datetime': startDatetime,
+                        'end_datetime': endDatetime,
+                        'host_id': userId,
+                        'price': _courtPrice,
+                        'slot_id': slotId,
+                        // 'venue_sport_id': null, // Add if you have this data
+                        // 'game_id': null, // Add if you have this data
+                      };
+
+                      debugPrint('Sending booking data: $bookingData');
+
+                      // Send POST request to create booking
+                      final base = dotenv.env['BASE_URL'] ?? '';
+                      final uri = Uri.parse('$base/user/venueBooking/');
+
+                      final response = await http.post(
+                        uri,
+                        headers: {
+                          'Authorization': 'Bearer $token',
+                          'Content-Type': 'application/json',
+                        },
+                        body: jsonEncode(bookingData),
+                      );
+
+                      debugPrint(
+                        'Booking response: ${response.statusCode} - ${response.body}',
+                      );
+
+                      if (response.statusCode == 200 ||
+                          response.statusCode == 201) {
+                        final responseData = jsonDecode(response.body);
+
+                        // Save Game to SharedPreferences
+                        final sportName =
+                            selectedSport['sport_name'] ?? 'Unknown';
+                        final displayDateStr =
+                            "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}";
+                        final totalPlayers = _playersController.text.isNotEmpty
+                            ? _playersController.text
+                            : '4';
+
+                        final newGame = {
+                          'sport': sportName,
+                          'image': '',
+                          'title': '$sportName Match',
+                          'location': _currentVenueName ?? 'Unknown Venue',
+                          'distance': '0.0 km',
+                          'players': '1/$totalPlayers',
+                          'level': 'Open',
+                          'date': displayDateStr,
+                          'time': _selectedSlot!,
+                          'isJoined': false,
+                          'isCreated': true,
+                          'booking_id':
+                              responseData['data']?['booking_id'], // Store booking ID if available
+                        };
+
+                        final String? existingGamesString = prefs.getString(
+                          'created_games',
+                        );
+                        List<dynamic> existingGames = [];
+                        if (existingGamesString != null) {
+                          existingGames = jsonDecode(existingGamesString);
+                        }
+                        existingGames.insert(0, newGame);
+                        await prefs.setString(
+                          'created_games',
+                          jsonEncode(existingGames),
+                        );
+
+                        if (!context.mounted) return;
+
+                        // Show success message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Booking Successful! Game Created.'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+
+                        // Navigate to PlayScreen (Index 1 of HomeScreen)
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const HomeScreen(initialIndex: 1),
+                          ),
+                          (route) => false,
+                        );
+                      } else {
+                        // Booking failed
+                        if (!context.mounted) return;
+                        final errorData = jsonDecode(response.body);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              errorData['message'] ??
+                                  'Booking failed. Please try again.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      debugPrint('Error creating booking: $e');
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
                     }
-                    existingGames.insert(0, newGame);
-                    await prefs.setString(
-                      'created_games',
-                      jsonEncode(existingGames),
-                    );
-
-                    if (!context.mounted) return;
-
-                    // Show success message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Booking Successful! Game Created.'),
-                        backgroundColor: Colors.green,
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-
-                    // Navigate to PlayScreen (Index 1 of HomeScreen)
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const HomeScreen(initialIndex: 1),
-                      ),
-                      (route) => false,
-                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: themeColor, // Use App Theme Color
