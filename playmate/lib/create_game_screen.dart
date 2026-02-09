@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:playmate/payment_summary_screen.dart';
+import 'package:playmate/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CreateGameScreen extends StatefulWidget {
@@ -239,44 +239,6 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                     const SizedBox(height: 16),
 
                     // Total Player Input
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _playersController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                hintText: 'Total players',
-                                hintStyle: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                  color: Colors.grey.shade500,
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
 
                     // Date Selection
                     Text(
@@ -454,7 +416,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (_selectedSportId == null || _selectedSlot == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -469,33 +431,60 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                       orElse: () => {'sport_name': 'Unknown'},
                     );
 
-                    // Parse price
-                    double courtPrice = 500.0;
-                    if (widget.price != null) {
-                      // Remove commas first, then remove non-digits/dots
-                      final cleanString = widget.price!
-                          .replaceAll(',', '')
-                          .replaceAll(RegExp(r'[^0-9.]'), '');
-                      if (cleanString.isNotEmpty) {
-                        courtPrice = double.tryParse(cleanString) ?? 500.0;
-                      }
-                    }
+                    // Save Game to SharedPreferences
+                    final prefs = await SharedPreferences.getInstance();
+                    final sportName = selectedSport['sport_name'] ?? 'Unknown';
+                    final dateStr =
+                        "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}";
+                    final totalPlayers = _playersController.text.isNotEmpty
+                        ? _playersController.text
+                        : '4';
 
-                    Navigator.push(
+                    final newGame = {
+                      'sport': sportName,
+                      'image': '',
+                      'title': '$sportName Match',
+                      'location': widget.venueName ?? 'Unknown Venue',
+                      'distance': '0.0 km',
+                      'players': '1/$totalPlayers',
+                      'level': 'Open',
+                      'date': dateStr,
+                      'time': _selectedSlot!,
+                      'isJoined': false,
+                      'isCreated': true,
+                    };
+
+                    final String? existingGamesString = prefs.getString(
+                      'created_games',
+                    );
+                    List<dynamic> existingGames = [];
+                    if (existingGamesString != null) {
+                      existingGames = jsonDecode(existingGamesString);
+                    }
+                    existingGames.insert(0, newGame);
+                    await prefs.setString(
+                      'created_games',
+                      jsonEncode(existingGames),
+                    );
+
+                    if (!context.mounted) return;
+
+                    // Show success message
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Game Created Successfully!'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+
+                    // Navigate to PlayScreen (Index 1 of HomeScreen)
+                    Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PaymentSummaryScreen(
-                          venueName: widget.venueName ?? 'Unknown Venue',
-                          sportName: selectedSport['sport_name'],
-                          date:
-                              "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}",
-                          time: _selectedSlot!,
-                          courtPrice: courtPrice,
-                          totalPlayers: _playersController.text.isNotEmpty
-                              ? _playersController.text
-                              : '4',
-                        ),
+                        builder: (context) => const HomeScreen(initialIndex: 1),
                       ),
+                      (route) => false,
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -506,7 +495,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                     elevation: 0,
                   ),
                   child: Text(
-                    'NEXT',
+                    'CREATE GAME',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

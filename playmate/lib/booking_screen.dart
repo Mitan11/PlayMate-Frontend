@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:playmate/payment_summary_screen.dart';
+import 'package:playmate/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 
@@ -48,6 +48,15 @@ class _BookingScreenState extends State<BookingScreen> {
   // Slots
   List<String> _slots = [];
   bool _isLoadingSlots = false;
+
+  // Map to store price for each slot
+  Map<String, double> _slotPrices = {};
+
+  // Price Data
+  double _courtPrice = 0.0;
+  double _convenienceFee = 0.0;
+  double _totalAmount = 0.0;
+  bool _isLoadingPrice = false;
 
   // State for venue selection mode (if widget.venueId is null)
   String? _currentVenueId;
@@ -185,28 +194,44 @@ class _BookingScreenState extends State<BookingScreen> {
           final slotsData = List<dynamic>.from(data['data']);
 
           setState(() {
-            _slots = slotsData
-                .map((e) {
-                  if (e is String) return e;
-                  if (e is Map) {
-                    final start = e['start_time']?.toString();
-                    final end = e['end_time']?.toString();
-                    if (start != null && end != null) {
-                      // Format "09:00:00" -> "09:00"
-                      final s = start.length >= 5
-                          ? start.substring(0, 5)
-                          : start;
-                      final e = end.length >= 5 ? end.substring(0, 5) : end;
-                      return '$s to $e';
-                    }
-                    return e['slot_time']?.toString() ??
-                        e['time']?.toString() ??
-                        e.toString();
+            _slots = [];
+            _slotPrices = {}; // Clear previous prices
+
+            for (var e in slotsData) {
+              if (e is Map) {
+                final start = e['start_time']?.toString();
+                final end = e['end_time']?.toString();
+                final priceData = e['price_per_slot'];
+
+                if (start != null && end != null) {
+                  // Format "09:00:00" -> "09:00"
+                  final s = start.length >= 5 ? start.substring(0, 5) : start;
+                  final endTime = end.length >= 5 ? end.substring(0, 5) : end;
+                  final slotTime = '$s to $endTime';
+
+                  _slots.add(slotTime);
+
+                  // Store price for this slot
+                  if (priceData != null) {
+                    final price = (priceData is int)
+                        ? priceData.toDouble()
+                        : (priceData is double)
+                        ? priceData
+                        : double.tryParse(priceData.toString()) ?? 0.0;
+                    _slotPrices[slotTime] = price;
+                    debugPrint(
+                      'Slot: $slotTime -> Price: $price (from API: $priceData)',
+                    );
                   }
-                  return e.toString();
-                })
-                .toList()
-                .cast<String>();
+                }
+              } else if (e is String) {
+                _slots.add(e);
+              }
+            }
+
+            debugPrint(
+              'Loaded ${_slots.length} slots with prices: $_slotPrices',
+            );
           });
         } else {
           debugPrint('API status false or data null: ${data['message']}');
@@ -218,6 +243,66 @@ class _BookingScreenState extends State<BookingScreen> {
       debugPrint('Error loading slots: $e');
     } finally {
       setState(() => _isLoadingSlots = false);
+    }
+  }
+
+  Future<void> _fetchPriceData() async {
+    debugPrint('--- _fetchPriceData Called ---');
+    debugPrint(
+      'Values -> VenueId: $_currentVenueId, SportId: $_selectedSportId, Date: $_selectedDate, Slot: $_selectedSlot',
+    );
+
+    if (_selectedSportId == null ||
+        _currentVenueId == null ||
+        _selectedSlot == null) {
+      debugPrint('WARNING: Missing required data for price fetch. Aborting.');
+      return;
+    }
+
+    setState(() {
+      _isLoadingPrice = true;
+    });
+
+    try {
+      // Get the price for the selected slot from the map
+      double courtPrice = _slotPrices[_selectedSlot] ?? 0.0;
+
+      // If court price is not available from slot map, use fallback
+      if (courtPrice == 0.0) {
+        // Parse price from _currentPrice if available
+        final priceString = _currentPrice;
+        if (priceString != null) {
+          // Remove commas first, then remove non-digits/dots
+          final cleanString = priceString
+              .replaceAll(',', '')
+              .replaceAll(RegExp(r'[^0-9.]'), '');
+          if (cleanString.isNotEmpty) {
+            courtPrice = double.tryParse(cleanString) ?? 500.0;
+          }
+        } else {
+          courtPrice = 500.0; // Default fallback
+        }
+      }
+
+      // Calculate convenience fee (10% of court price or minimum 50)
+      double convenienceFee = 50;
+
+      // Calculate total
+      double totalAmount = courtPrice + convenienceFee;
+
+      debugPrint(
+        'Selected Slot: $_selectedSlot, Court Price: $courtPrice, Fee: $convenienceFee, Total: $totalAmount',
+      );
+
+      setState(() {
+        _courtPrice = courtPrice;
+        _convenienceFee = convenienceFee;
+        _totalAmount = totalAmount;
+      });
+    } catch (e) {
+      debugPrint('Error calculating price: $e');
+    } finally {
+      setState(() => _isLoadingPrice = false);
     }
   }
 
@@ -432,46 +517,6 @@ class _BookingScreenState extends State<BookingScreen> {
                     _buildInputLabelField('Area', _areaController),
                     const SizedBox(height: 16),
 
-                    // Total Player Input
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _playersController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                hintText: 'Total players',
-                                hintStyle: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                  color: Colors.grey.shade500,
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
                     // Date Selection
                     Text(
                       'Select Date',
@@ -600,11 +645,14 @@ class _BookingScreenState extends State<BookingScreen> {
                             ]
                           : _slots.map((slot) {
                               final isSelected = _selectedSlot == slot;
+                              final slotPrice = _slotPrices[slot] ?? 0.0;
+
                               return GestureDetector(
                                 onTap: () {
                                   setState(() {
                                     _selectedSlot = slot;
                                   });
+                                  _fetchPriceData();
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
@@ -622,20 +670,153 @@ class _BookingScreenState extends State<BookingScreen> {
                                           : Colors.grey.shade300,
                                     ),
                                   ),
-                                  child: Text(
-                                    slot,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.black87,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        slot,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.black87,
+                                        ),
+                                      ),
+                                      if (slotPrice > 0) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'INR ${slotPrice.toStringAsFixed(0)}',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: isSelected
+                                                ? Colors.white.withOpacity(0.9)
+                                                : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                               );
                             }).toList(),
                     ),
+
+                    // Price Breakdown Section - Only show if price data is loaded
+                    if (_selectedSlot != null &&
+                        !_isLoadingPrice &&
+                        _totalAmount > 0) ...[
+                      const SizedBox(height: 30),
+
+                      // Price Details Section
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade100),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildPriceRow(
+                              'Court Price',
+                              'INR ${_courtPrice.toStringAsFixed(0)}',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildPriceRow(
+                              'Convenience Fee',
+                              'INR ${_convenienceFee.toStringAsFixed(0)}',
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Total Amount Section
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.grey.shade900,
+                              Colors.grey.shade800,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Total Amount',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'Pay at Venue',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'INR ${_totalAmount.toStringAsFixed(1)}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // Loading indicator for price
+                    if (_selectedSlot != null && _isLoadingPrice) ...[
+                      const SizedBox(height: 30),
+                      const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -648,7 +829,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (_selectedSportId == null || _selectedSlot == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -663,34 +844,60 @@ class _BookingScreenState extends State<BookingScreen> {
                       orElse: () => {'sport_name': 'Unknown'},
                     );
 
-                    // Parse price
-                    double courtPrice = 500.0;
-                    final priceString = _currentPrice;
-                    if (priceString != null) {
-                      // Remove commas first, then remove non-digits/dots
-                      final cleanString = priceString
-                          .replaceAll(',', '')
-                          .replaceAll(RegExp(r'[^0-9.]'), '');
-                      if (cleanString.isNotEmpty) {
-                        courtPrice = double.tryParse(cleanString) ?? 500.0;
-                      }
-                    }
+                    // Save Game to SharedPreferences
+                    final prefs = await SharedPreferences.getInstance();
+                    final sportName = selectedSport['sport_name'] ?? 'Unknown';
+                    final dateStr =
+                        "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}";
+                    final totalPlayers = _playersController.text.isNotEmpty
+                        ? _playersController.text
+                        : '4';
 
-                    Navigator.push(
+                    final newGame = {
+                      'sport': sportName,
+                      'image': '',
+                      'title': '$sportName Match',
+                      'location': _currentVenueName ?? 'Unknown Venue',
+                      'distance': '0.0 km',
+                      'players': '1/$totalPlayers',
+                      'level': 'Open',
+                      'date': dateStr,
+                      'time': _selectedSlot!,
+                      'isJoined': false,
+                      'isCreated': true,
+                    };
+
+                    final String? existingGamesString = prefs.getString(
+                      'created_games',
+                    );
+                    List<dynamic> existingGames = [];
+                    if (existingGamesString != null) {
+                      existingGames = jsonDecode(existingGamesString);
+                    }
+                    existingGames.insert(0, newGame);
+                    await prefs.setString(
+                      'created_games',
+                      jsonEncode(existingGames),
+                    );
+
+                    if (!context.mounted) return;
+
+                    // Show success message
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Booking Successful! Game Created.'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+
+                    // Navigate to PlayScreen (Index 1 of HomeScreen)
+                    Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PaymentSummaryScreen(
-                          venueName: _currentVenueName ?? 'Unknown Venue',
-                          sportName: selectedSport['sport_name'],
-                          date:
-                              "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}",
-                          time: _selectedSlot!,
-                          courtPrice: courtPrice,
-                          totalPlayers: _playersController.text.isNotEmpty
-                              ? _playersController.text
-                              : '4',
-                        ),
+                        builder: (context) => const HomeScreen(initialIndex: 1),
                       ),
+                      (route) => false,
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -701,7 +908,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     elevation: 0,
                   ),
                   child: Text(
-                    'NEXT',
+                    'CONFIRM BOOKING',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -755,6 +962,30 @@ class _BookingScreenState extends State<BookingScreen> {
 
     // Additional logic for "Today" if needed, but strict day name is fine.
     return days[weekday - 1];
+  }
+
+  Widget _buildPriceRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
+        ),
+      ],
+    );
   }
 }
 
