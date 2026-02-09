@@ -83,7 +83,7 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
             ],
           ),
           child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
           ),
         ),
