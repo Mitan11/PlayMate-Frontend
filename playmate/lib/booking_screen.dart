@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'dart:convert';
@@ -7,6 +8,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:playmate/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+
+enum PaymentMethod { payAtVenue, online }
 
 class BookingScreen extends StatefulWidget {
   final String? initialArea;
@@ -57,9 +61,15 @@ class _BookingScreenState extends State<BookingScreen> {
 
   // Price Data
   double _courtPrice = 0.0;
-  double _convenienceFee = 0.0;
+
   double _totalAmount = 0.0;
   bool _isLoadingPrice = false;
+
+  // Payment
+  PaymentMethod _paymentMethod = PaymentMethod.payAtVenue;
+  Razorpay? _razorpay;
+  bool _isProcessingPayment = false;
+  final bool _isRazorpayAvailable = !kIsWeb;
 
   // State for venue selection mode (if widget.venueId is null)
   String? _currentVenueId;
@@ -87,6 +97,367 @@ class _BookingScreenState extends State<BookingScreen> {
     } else {
       // Venue selection mode
       _fetchVenues();
+    }
+
+    _setupRazorpay();
+  }
+
+  @override
+  void dispose() {
+    _razorpay?.clear();
+    _areaController.dispose();
+    _playersController.dispose();
+    super.dispose();
+  }
+
+  void _setupRazorpay() {
+    if (!_isRazorpayAvailable) {
+      return;
+    }
+
+    _razorpay = Razorpay();
+    _razorpay?.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay?.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay?.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    if (!mounted) return;
+    setState(() => _isProcessingPayment = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Payment successful.'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    final paymentData = {
+      'razorpay_order_id': response.orderId,
+      'razorpay_payment_id': response.paymentId,
+      'razorpay_signature': response.signature,
+    };
+
+    _createBooking(payment: paymentData);
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() => _isProcessingPayment = false);
+    final message = response.message ?? 'Payment failed. Please try again.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('External wallet: ${response.walletName ?? 'Unknown'}'),
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>?> _createRazorpayOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    if (token == null) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to continue'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return null;
+    }
+
+    final base = dotenv.env['BASE_URL'] ?? '';
+    final uri = Uri.parse('$base/user/payments/order');
+    final receipt = 'booking_${DateTime.now().millisecondsSinceEpoch}';
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'amount': _totalAmount.round(),
+        'currency': 'INR',
+        'receipt': receipt,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      final orderData = data['data'] ?? data;
+
+      final orderId = orderData['order_id']?.toString();
+      final amountRaw = orderData['amount'];
+      final currency = orderData['currency']?.toString() ?? 'INR';
+      final amount = amountRaw is int
+          ? amountRaw
+          : int.tryParse(amountRaw?.toString() ?? '');
+
+      if (orderId == null || amount == null) {
+        if (!mounted) return null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid order response. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return null;
+      }
+
+      return {'order_id': orderId, 'amount': amount, 'currency': currency};
+    }
+
+    if (!mounted) return null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Order failed: ${response.body}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return null;
+  }
+
+  Future<void> _startOnlinePayment({bool upiOnly = false}) async {
+    if (!_isRazorpayAvailable) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Online payment is not available on web.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final keyId = dotenv.env['RAZORPAY_KEY_ID'];
+    if (keyId == null || keyId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Missing Razorpay key. Please configure it.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_totalAmount <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid amount. Please re-check your booking.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isProcessingPayment = true);
+
+    final orderData = await _createRazorpayOrder();
+    if (orderData == null) {
+      if (!mounted) return;
+      setState(() => _isProcessingPayment = false);
+      return;
+    }
+
+    final options = {
+      'key': keyId,
+      'order_id': orderData['order_id'],
+      'amount': orderData['amount'],
+      'currency': orderData['currency'],
+      'name': _currentVenueName ?? 'PlayMate',
+      'description': 'Venue booking',
+      'theme': {'color': '#2E7D32'},
+    };
+
+    if (upiOnly) {
+      options['method'] = {'upi': true};
+      options['config'] = {
+        'display': {
+          'blocks': {
+            'upi': {
+              'name': 'UPI',
+              'instruments': [
+                {'method': 'upi'},
+              ],
+            },
+          },
+          'sequence': ['block.upi'],
+          'preferences': {'show_default_blocks': false},
+        },
+      };
+    }
+
+    try {
+      _razorpay?.open(options);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isProcessingPayment = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Payment error: $e')));
+    }
+  }
+
+  Future<void> _createBooking({required dynamic payment}) async {
+    if (_selectedSportId == null || _selectedSlot == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select sport and slot')),
+      );
+      return;
+    }
+
+    final selectedSport = _sportsList.firstWhere(
+      (s) => s['sport_id'].toString() == _selectedSportId,
+      orElse: () => {'sport_name': 'Unknown'},
+    );
+
+    try {
+      // Get auth token and user ID
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      // Try to get user_id as int first, then as string
+      String? userId = prefs.getString('user_id');
+
+      if (token == null || userId == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please login to continue'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Get slot_id for the selected slot
+      final slotId = _slotIds[_selectedSlot] ?? 0;
+
+      // Format datetime for API (YYYY-MM-DD HH:MM:SS)
+      final dateStr =
+          "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+
+      // Extract start and end time from selected slot (e.g., "07:00 to 08:00")
+      final slotParts = _selectedSlot!.split(' to ');
+      final startTime = slotParts.isNotEmpty ? slotParts[0] : '00:00';
+      final endTime = slotParts.length > 1 ? slotParts[1] : '00:00';
+
+      final startDatetime = '$dateStr $startTime:00';
+      final endDatetime = '$dateStr $endTime:00';
+
+      // Prepare booking data
+      final bookingData = {
+        'sport_id': int.parse(_selectedSportId!),
+        'venue_id': int.parse(_currentVenueId!),
+        'start_datetime': startDatetime,
+        'end_datetime': endDatetime,
+        'host_id': userId,
+        'price': _courtPrice,
+        'slot_id': slotId,
+        'payment': payment,
+      };
+
+      debugPrint('Sending booking data: $bookingData');
+
+      // Send POST request to create booking
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final uri = Uri.parse('$base/user/venueBooking');
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(bookingData),
+      );
+
+      debugPrint('Booking response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+
+        // Save Game to SharedPreferences
+        final sportName = selectedSport['sport_name'] ?? 'Unknown';
+        final displayDateStr =
+            "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}";
+        final totalPlayers = _playersController.text.isNotEmpty
+            ? _playersController.text
+            : '4';
+
+        final newGame = {
+          'sport': sportName,
+          'image': '',
+          'title': '$sportName Match',
+          'location': _currentVenueName ?? 'Unknown Venue',
+          'distance': '0.0 km',
+          'players': '1/$totalPlayers',
+          'level': 'Open',
+          'date': displayDateStr,
+          'time': _selectedSlot!,
+          'isJoined': false,
+          'isCreated': true,
+          'booking_id': responseData['data']?['booking_id'],
+        };
+
+        final String? existingGamesString = prefs.getString('created_games');
+        List<dynamic> existingGames = [];
+        if (existingGamesString != null) {
+          existingGames = jsonDecode(existingGamesString);
+        }
+        existingGames.insert(0, newGame);
+        await prefs.setString('created_games', jsonEncode(existingGames));
+
+        if (!mounted) return;
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking Successful! Game Created.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Navigate to PlayScreen (Index 1 of HomeScreen)
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const HomeScreen(initialIndex: 1),
+          ),
+          (route) => false,
+        );
+      } else {
+        // Booking failed
+        if (!mounted) return;
+        final errorData = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errorData['message'] ?? 'Booking failed. Please try again.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error creating booking: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -297,19 +668,16 @@ class _BookingScreenState extends State<BookingScreen> {
         }
       }
 
-      // Calculate convenience fee (10% of court price or minimum 50)
-      double convenienceFee = 50;
-
       // Calculate total
-      double totalAmount = courtPrice + convenienceFee;
+      double totalAmount = courtPrice;
 
       debugPrint(
-        'Selected Slot: $_selectedSlot, Court Price: $courtPrice, Fee: $convenienceFee, Total: $totalAmount',
+        'Selected Slot: $_selectedSlot, Court Price: $courtPrice, Total: $totalAmount',
       );
 
       setState(() {
         _courtPrice = courtPrice;
-        _convenienceFee = convenienceFee;
+
         _totalAmount = totalAmount;
       });
     } catch (e) {
@@ -336,12 +704,10 @@ class _BookingScreenState extends State<BookingScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF3F8F3),
         elevation: 0,
-        leading: widget.venueId == null
-            ? null
-            : IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black),
-                onPressed: () => Navigator.pop(context),
-              ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(
           'Select Venue',
           style: GoogleFonts.poppins(
@@ -739,11 +1105,6 @@ class _BookingScreenState extends State<BookingScreen> {
                               'Court Price',
                               'INR ${_courtPrice.toStringAsFixed(0)}',
                             ),
-                            const SizedBox(height: 12),
-                            _buildPriceRow(
-                              'Convenience Fee',
-                              'INR ${_convenienceFee.toStringAsFixed(0)}',
-                            ),
                           ],
                         ),
                       ),
@@ -796,7 +1157,9 @@ class _BookingScreenState extends State<BookingScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    'Pay at Venue',
+                                    _paymentMethod == PaymentMethod.online
+                                        ? 'Pay Online'
+                                        : 'Pay at Venue',
                                     style: GoogleFonts.poppins(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
@@ -819,6 +1182,110 @@ class _BookingScreenState extends State<BookingScreen> {
                                   ),
                                 ),
                               ],
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Payment Method
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Payment Method',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  RadioListTile<PaymentMethod>(
+                                    value: PaymentMethod.payAtVenue,
+                                    groupValue: _paymentMethod,
+                                    onChanged: (value) {
+                                      if (value == null) return;
+                                      setState(() => _paymentMethod = value);
+                                    },
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(
+                                      'Pay at Venue',
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      'Pay at the venue. Booking marked unpaid.',
+                                      style: GoogleFonts.poppins(fontSize: 12),
+                                    ),
+                                  ),
+                                  RadioListTile<PaymentMethod>(
+                                    value: PaymentMethod.online,
+                                    groupValue: _paymentMethod,
+                                    onChanged: _isRazorpayAvailable
+                                        ? (value) {
+                                            if (value == null) return;
+                                            setState(
+                                              () => _paymentMethod = value,
+                                            );
+                                          }
+                                        : null,
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(
+                                      'Pay Online',
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      _isRazorpayAvailable
+                                          ? 'Pay now via Razorpay and confirm booking.'
+                                          : 'Online payment not available on web.',
+                                      style: GoogleFonts.poppins(fontSize: 12),
+                                    ),
+                                  ),
+                                  if (_paymentMethod == PaymentMethod.online)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton(
+                                          onPressed:
+                                              !_isRazorpayAvailable ||
+                                                  _isProcessingPayment
+                                              ? null
+                                              : () async {
+                                                  await _startOnlinePayment(
+                                                    upiOnly: true,
+                                                  );
+                                                },
+                                          style: OutlinedButton.styleFrom(
+                                            side: BorderSide(color: themeColor),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'PAY VIA UPI',
+                                            style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.w600,
+                                              color: themeColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -844,178 +1311,25 @@ class _BookingScreenState extends State<BookingScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () async {
-                    if (_selectedSportId == null || _selectedSlot == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please select sport and slot'),
-                        ),
-                      );
-                      return;
-                    }
+                  onPressed: _isProcessingPayment
+                      ? null
+                      : () async {
+                          if (_selectedSportId == null ||
+                              _selectedSlot == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please select sport and slot'),
+                              ),
+                            );
+                            return;
+                          }
 
-                    final selectedSport = _sportsList.firstWhere(
-                      (s) => s['sport_id'].toString() == _selectedSportId,
-                      orElse: () => {'sport_name': 'Unknown'},
-                    );
-
-                    try {
-                      // Get auth token and user ID
-                      final prefs = await SharedPreferences.getInstance();
-                      final token = prefs.getString('auth_token');
-
-                      // Try to get user_id as int first, then as string
-                      String? userId = prefs.getString('user_id');
-
-                      if (token == null || userId == null) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please login to continue'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      // Get slot_id for the selected slot
-                      final slotId = _slotIds[_selectedSlot] ?? 0;
-
-                      // Format datetime for API (YYYY-MM-DD HH:MM:SS)
-                      final dateStr =
-                          "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
-
-                      // Extract start and end time from selected slot (e.g., "07:00 to 08:00")
-                      final slotParts = _selectedSlot!.split(' to ');
-                      final startTime = slotParts.isNotEmpty
-                          ? slotParts[0]
-                          : '00:00';
-                      final endTime = slotParts.length > 1
-                          ? slotParts[1]
-                          : '00:00';
-
-                      final startDatetime = '$dateStr $startTime:00';
-                      final endDatetime = '$dateStr $endTime:00';
-
-                      // Prepare booking data
-                      final bookingData = {
-                        'sport_id': int.parse(_selectedSportId!),
-                        'venue_id': int.parse(_currentVenueId!),
-                        'start_datetime': startDatetime,
-                        'end_datetime': endDatetime,
-                        'host_id': userId,
-                        'price': _courtPrice,
-                        'slot_id': slotId,
-                        // 'venue_sport_id': null, // Add if you have this data
-                        // 'game_id': null, // Add if you have this data
-                      };
-
-                      debugPrint('Sending booking data: $bookingData');
-
-                      // Send POST request to create booking
-                      final base = dotenv.env['BASE_URL'] ?? '';
-                      final uri = Uri.parse('$base/user/venueBooking/');
-
-                      final response = await http.post(
-                        uri,
-                        headers: {
-                          'Authorization': 'Bearer $token',
-                          'Content-Type': 'application/json',
+                          if (_paymentMethod == PaymentMethod.online) {
+                            await _startOnlinePayment();
+                          } else {
+                            await _createBooking(payment: 'unpaid');
+                          }
                         },
-                        body: jsonEncode(bookingData),
-                      );
-
-                      debugPrint(
-                        'Booking response: ${response.statusCode} - ${response.body}',
-                      );
-
-                      if (response.statusCode == 200 ||
-                          response.statusCode == 201) {
-                        final responseData = jsonDecode(response.body);
-
-                        // Save Game to SharedPreferences
-                        final sportName =
-                            selectedSport['sport_name'] ?? 'Unknown';
-                        final displayDateStr =
-                            "${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}";
-                        final totalPlayers = _playersController.text.isNotEmpty
-                            ? _playersController.text
-                            : '4';
-
-                        final newGame = {
-                          'sport': sportName,
-                          'image': '',
-                          'title': '$sportName Match',
-                          'location': _currentVenueName ?? 'Unknown Venue',
-                          'distance': '0.0 km',
-                          'players': '1/$totalPlayers',
-                          'level': 'Open',
-                          'date': displayDateStr,
-                          'time': _selectedSlot!,
-                          'isJoined': false,
-                          'isCreated': true,
-                          'booking_id':
-                              responseData['data']?['booking_id'], // Store booking ID if available
-                        };
-
-                        final String? existingGamesString = prefs.getString(
-                          'created_games',
-                        );
-                        List<dynamic> existingGames = [];
-                        if (existingGamesString != null) {
-                          existingGames = jsonDecode(existingGamesString);
-                        }
-                        existingGames.insert(0, newGame);
-                        await prefs.setString(
-                          'created_games',
-                          jsonEncode(existingGames),
-                        );
-
-                        if (!context.mounted) return;
-
-                        // Show success message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Booking Successful! Game Created.'),
-                            backgroundColor: Colors.green,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-
-                        // Navigate to PlayScreen (Index 1 of HomeScreen)
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const HomeScreen(initialIndex: 1),
-                          ),
-                          (route) => false,
-                        );
-                      } else {
-                        // Booking failed
-                        if (!context.mounted) return;
-                        final errorData = jsonDecode(response.body);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              errorData['message'] ??
-                                  'Booking failed. Please try again.',
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint('Error creating booking: $e');
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: themeColor, // Use App Theme Color
                     shape: RoundedRectangleBorder(
@@ -1024,7 +1338,11 @@ class _BookingScreenState extends State<BookingScreen> {
                     elevation: 0,
                   ),
                   child: Text(
-                    'CONFIRM BOOKING',
+                    _isProcessingPayment
+                        ? 'PROCESSING...'
+                        : _paymentMethod == PaymentMethod.online
+                        ? 'PAY & CONFIRM'
+                        : 'CONFIRM BOOKING',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
