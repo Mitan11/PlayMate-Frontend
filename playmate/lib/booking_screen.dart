@@ -336,7 +336,6 @@ class _BookingScreenState extends State<BookingScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF3F8F3),
         elevation: 0,
-        // Only show back button when coming from Create Game (widget.venueId == null)
         leading: widget.venueId == null
             ? null
             : IconButton(
