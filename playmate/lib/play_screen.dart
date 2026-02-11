@@ -18,16 +18,20 @@ class PlayScreen extends StatefulWidget {
 class _PlayScreenState extends State<PlayScreen> {
   final Color themeColor = const Color(0xFF2E7D32);
   late String _selectedFilter; // Options: All Games, Joined, Created
-  List<Map<String, dynamic>> _sportsFilters = [];
+  List<Map<String, dynamic>>? _sportsFilters;
   String _selectedSportFilter = 'All';
   // ignore: unused_field
   bool _isLoadingSports = false;
+  bool _isLoadingGames = false;
+  bool _isLoadingJoinedGames = false;
+  bool _isLoadingCreatedGames = false;
 
   @override
   void initState() {
     super.initState();
     _selectedFilter = widget.initialFilter;
     _fetchAllSports();
+    _fetchAllGames();
     _loadCreatedGames(); // Load saved games
   }
 
@@ -39,10 +43,11 @@ class _PlayScreenState extends State<PlayScreen> {
         final List<dynamic> loadedGames = jsonDecode(createdGamesString);
         setState(() {
           // Filter out existing created games to avoid duplicates if re-loading
-          _allPlayItems.removeWhere((item) => item['isCreated'] == true);
+          _createdPlayItems ??= [];
+          _createdPlayItems!.removeWhere((item) => item['isCreated'] == true);
 
           // Add loaded games
-          _allPlayItems.addAll(loadedGames.cast<Map<String, dynamic>>());
+          _createdPlayItems!.addAll(loadedGames.cast<Map<String, dynamic>>());
         });
       } catch (e) {
         debugPrint('Error loading created games: $e');
@@ -81,64 +86,182 @@ class _PlayScreenState extends State<PlayScreen> {
     }
   }
 
-  List<Map<String, dynamic>> _allPlayItems = [
-    {
-      'sport': 'Tennis',
-      'image': 'assets/images/tennis_court.jpg',
-      'title': 'Evening Doubles Match',
-      'location': 'Green Valley Club',
-      'distance': '2.5 km',
-      'players': '3/4',
-      'level': 'Intermediate',
-      'isJoined': true,
-      'isCreated': false,
-    },
-    {
-      'sport': 'Badminton',
-      'image': '',
-      'title': 'Weekend Badminton',
-      'location': 'City Sports Complex',
-      'distance': '4.0 km',
-      'players': '2/4',
-      'level': 'Beginner',
-      'isJoined': false,
-      'isCreated': true,
-    },
-    {
-      'sport': 'Cricket',
-      'image': '',
-      'title': 'Friendly Box Cricket',
-      'location': 'Metro Turf',
-      'distance': '1.2 km',
-      'players': '8/12',
-      'level': 'All Levels',
-      'isJoined': false,
-      'isCreated': false,
-    },
-    {
-      'sport': 'Tennis',
-      'image': '',
-      'title': 'Morning Singles',
-      'location': 'City Court',
-      'distance': '1.0 km',
-      'players': '1/2',
-      'level': 'Pro',
-      'isJoined': false,
-      'isCreated': false,
-    },
-  ];
+  Future<void> _fetchAllGames() async {
+    setState(() => _isLoadingGames = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final uri = Uri.parse('$base/user/allGames');
+      final resp = await http.get(
+        uri,
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      );
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final rows =
+            (data is Map<String, dynamic> ? data['data'] : data)
+                as List<dynamic>?;
+        if (rows != null) {
+          setState(() {
+            _allPlayItems = rows.map((row) {
+              final Map<String, dynamic> item = Map<String, dynamic>.from(
+                row as Map,
+              );
+              final sportName = item['sport_name']?.toString() ?? 'Unknown';
+              final venueName = item['venue_name']?.toString();
+              final address = item['address']?.toString();
+              final joinedCount =
+                  item['total_joined_player']?.toString() ?? '0';
+              return {
+                'sport': sportName,
+                'image': '',
+                'title': '$sportName Game',
+                'location': venueName ?? address ?? 'Unknown',
+                'distance': 'N/A',
+                'players': joinedCount,
+                'level': 'All Levels',
+                'isJoined': false,
+                'isCreated': false,
+              };
+            }).toList();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading games: $e');
+    } finally {
+      setState(() => _isLoadingGames = false);
+    }
+  }
+
+  Future<void> _fetchJoinedGames() async {
+    setState(() => _isLoadingJoinedGames = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final uri = Uri.parse('$base/user/joinedGames');
+      final resp = await http.get(
+        uri,
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      );
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final rows =
+            (data is Map<String, dynamic> ? data['data'] : data)
+                as List<dynamic>?;
+        if (rows != null) {
+          setState(() {
+            _joinedPlayItems = rows.map((row) {
+              final Map<String, dynamic> item = Map<String, dynamic>.from(
+                row as Map,
+              );
+              final sportName = item['sport_name']?.toString() ?? 'Unknown';
+              final venueName = item['venue_name']?.toString();
+              final venueLocation = item['venue_location']?.toString();
+              final joinedCount = item['total_players']?.toString() ?? '0';
+              return {
+                'sport': sportName,
+                'image': '',
+                'title': '$sportName Game',
+                'location': venueName ?? venueLocation ?? 'Unknown',
+                'distance': 'N/A',
+                'players': joinedCount,
+                'level': 'All Levels',
+                'isJoined': true,
+                'isCreated': false,
+              };
+            }).toList();
+          });
+        } else {
+          debugPrint('Joined games: data is null or not a list');
+        }
+      } else {
+        debugPrint(
+          'Joined games request failed: ${resp.statusCode} ${resp.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error loading joined games: $e');
+    } finally {
+      setState(() => _isLoadingJoinedGames = false);
+    }
+  }
+
+  Future<void> _fetchCreatedGames() async {
+    setState(() => _isLoadingCreatedGames = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final uri = Uri.parse('$base/user/usersCreatedGames');
+      final resp = await http.get(
+        uri,
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      );
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final rows =
+            (data is Map<String, dynamic> ? data['data'] : data)
+                as List<dynamic>?;
+        if (rows != null) {
+          setState(() {
+            _createdPlayItems = rows.map((row) {
+              final Map<String, dynamic> item = Map<String, dynamic>.from(
+                row as Map,
+              );
+              final sportName = item['sport_name']?.toString() ?? 'Unknown';
+              final venueName = item['venue_name']?.toString();
+              final address = item['address']?.toString();
+              final joinedCount =
+                  item['total_joined_player']?.toString() ?? '0';
+              return {
+                'sport': sportName,
+                'image': '',
+                'title': '$sportName Game',
+                'location': venueName ?? address ?? 'Unknown',
+                'distance': 'N/A',
+                'players': joinedCount,
+                'level': 'All Levels',
+                'isJoined': false,
+                'isCreated': true,
+              };
+            }).toList();
+          });
+        } else {
+          debugPrint('Created games: data is null or not a list');
+        }
+      } else {
+        debugPrint(
+          'Created games request failed: ${resp.statusCode} ${resp.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error loading created games: $e');
+    } finally {
+      setState(() => _isLoadingCreatedGames = false);
+    }
+  }
+
+  List<Map<String, dynamic>>? _allPlayItems;
+  List<Map<String, dynamic>>? _joinedPlayItems;
+  List<Map<String, dynamic>>? _createdPlayItems;
 
   List<Map<String, dynamic>> get _filteredItems {
-    List<Map<String, dynamic>> items = _allPlayItems;
+    List<Map<String, dynamic>> items;
 
     // First filter by Main Tab
     if (_selectedFilter == 'Joined') {
-      items = items.where((item) => item['isJoined'] == true).toList();
+      items = _joinedPlayItems ?? [];
     } else if (_selectedFilter == 'Created') {
-      items = items.where((item) => item['isCreated'] == true).toList();
+      items = _createdPlayItems ?? [];
     } else {
       // All Games: Show only games that are NOT joined AND NOT created
-      items = items
+      items = (_allPlayItems ?? [])
           .where(
             (item) => item['isJoined'] != true && item['isCreated'] != true,
           )
@@ -159,8 +282,18 @@ class _PlayScreenState extends State<PlayScreen> {
     return items;
   }
 
+  List<Map<String, dynamic>> _getFilteredItemsSafe() {
+    try {
+      return _filteredItems;
+    } catch (e) {
+      debugPrint('Error building filtered items: $e');
+      return [];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filteredItems = _getFilteredItemsSafe();
     return Scaffold(
       backgroundColor: const Color(0xFFF3F8F3),
       body: Column(
@@ -180,7 +313,7 @@ class _PlayScreenState extends State<PlayScreen> {
           ),
 
           // Sport Filters List
-          if (_sportsFilters.isNotEmpty)
+          if ((_sportsFilters ?? []).isNotEmpty)
             Container(
               height: 50,
               color: Colors.white,
@@ -190,13 +323,13 @@ class _PlayScreenState extends State<PlayScreen> {
                   vertical: 8,
                 ),
                 scrollDirection: Axis.horizontal,
-                itemCount: _sportsFilters.length + 1,
+                itemCount: (_sportsFilters ?? []).length + 1,
                 separatorBuilder: (context, index) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return _buildSportFilterChip('All');
                   }
-                  final sport = _sportsFilters[index - 1];
+                  final sport = (_sportsFilters ?? [])[index - 1];
                   return _buildSportFilterChip(
                     sport['sport_name'] ?? 'Unknown',
                   );
@@ -247,41 +380,55 @@ class _PlayScreenState extends State<PlayScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 await _fetchAllSports();
+                if (_selectedFilter == 'Joined') {
+                  await _fetchJoinedGames();
+                } else if (_selectedFilter == 'Created') {
+                  await _fetchCreatedGames();
+                } else {
+                  await _fetchAllGames();
+                }
                 await _loadCreatedGames(); // Reload games on refresh
                 // Simulate data reload for matches
                 await Future.delayed(const Duration(milliseconds: 500));
                 setState(() {}); // Refresh UI
               },
               color: themeColor,
-              child: _filteredItems.isEmpty
+              child: filteredItems.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.sports_tennis_outlined,
-                            size: 64,
-                            color: Colors.grey.shade300,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No game found',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade500,
+                      child:
+                          (_selectedFilter == 'Joined'
+                              ? _isLoadingJoinedGames
+                              : _selectedFilter == 'Created'
+                              ? _isLoadingCreatedGames
+                              : _isLoadingGames)
+                          ? const CircularProgressIndicator()
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.sports_tennis_outlined,
+                                  size: 64,
+                                  color: Colors.grey.shade300,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No game found',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _filteredItems.length,
+                      itemCount: filteredItems.length,
                       separatorBuilder: (context, index) =>
                           const SizedBox(height: 16),
                       itemBuilder: (context, index) {
-                        final item = _filteredItems[index];
+                        final item = filteredItems[index];
                         return Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -297,66 +444,6 @@ class _PlayScreenState extends State<PlayScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade200,
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(16),
-                                  ),
-                                ),
-                                child: Stack(
-                                  children: [
-                                    Center(
-                                      child: Icon(
-                                        item['sport'] == 'Tennis'
-                                            ? Icons.sports_tennis
-                                            : item['sport'] == 'Badminton'
-                                            ? Icons.sports_tennis_outlined
-                                            : Icons.sports_cricket,
-                                        size: 48,
-                                        color: Colors.grey.shade400,
-                                      ),
-                                    ),
-                                    if (item['isJoined'] == true)
-                                      Positioned(
-                                        top: 12,
-                                        right: 12,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(
-                                                Icons.check,
-                                                color: Colors.white,
-                                                size: 12,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Joined',
-                                                style: GoogleFonts.poppins(
-                                                  color: Colors.white,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
                               Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
@@ -384,13 +471,6 @@ class _PlayScreenState extends State<PlayScreen> {
                                               fontWeight: FontWeight.w600,
                                               color: themeColor,
                                             ),
-                                          ),
-                                        ),
-                                        Text(
-                                          item['distance'],
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
                                           ),
                                         ),
                                       ],
@@ -448,29 +528,7 @@ class _PlayScreenState extends State<PlayScreen> {
                                             ],
                                           ),
                                         ),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Level',
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 11,
-                                                  color: Colors.grey.shade500,
-                                                ),
-                                              ),
-                                              Text(
-                                                item['level'],
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.black87,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
+
                                         if (item['isCreated'] == true)
                                           OutlinedButton(
                                             onPressed: () {
@@ -592,7 +650,16 @@ class _PlayScreenState extends State<PlayScreen> {
         onTap: () {
           setState(() {
             _selectedFilter = title;
+            if (title == 'Joined') {
+              _selectedSportFilter = 'All';
+            }
           });
+          if (title == 'Joined' && (_joinedPlayItems?.isEmpty ?? true)) {
+            _fetchJoinedGames();
+          } else if (title == 'Created' &&
+              (_createdPlayItems?.isEmpty ?? true)) {
+            _fetchCreatedGames();
+          }
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
