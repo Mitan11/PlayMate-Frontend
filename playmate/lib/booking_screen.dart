@@ -336,10 +336,12 @@ class _BookingScreenState extends State<BookingScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF3F8F3),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: widget.venueId == null
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                onPressed: () => Navigator.pop(context),
+              ),
         title: Text(
           'Select Venue',
           style: GoogleFonts.poppins(
@@ -864,7 +866,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
                       // Try to get user_id as int first, then as string
                       String? userId = prefs.getString('user_id');
-                      
+
                       if (token == null || userId == null) {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
