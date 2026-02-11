@@ -123,11 +123,11 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
     if (!mounted) return;
-    setState(() => _isProcessingPayment = false);
+    // Keep loading while we create the booking
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Payment successful.'),
+        content: Text('Payment successful. Finalizing booking...'),
         backgroundColor: Colors.green,
       ),
     );
@@ -312,6 +312,7 @@ class _BookingScreenState extends State<BookingScreen> {
   Future<void> _createBooking({required dynamic payment}) async {
     if (_selectedSportId == null || _selectedSlot == null) {
       if (!mounted) return;
+      setState(() => _isProcessingPayment = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select sport and slot')),
       );
@@ -333,6 +334,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
       if (token == null || userId == null) {
         if (!mounted) return;
+        setState(() => _isProcessingPayment = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please login to continue'),
@@ -442,6 +444,7 @@ class _BookingScreenState extends State<BookingScreen> {
       } else {
         // Booking failed
         if (!mounted) return;
+        setState(() => _isProcessingPayment = false);
         final errorData = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -455,6 +458,7 @@ class _BookingScreenState extends State<BookingScreen> {
     } catch (e) {
       debugPrint('Error creating booking: $e');
       if (!mounted) return;
+      setState(() => _isProcessingPayment = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
@@ -817,17 +821,19 @@ class _BookingScreenState extends State<BookingScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            // If we came from external selection, pop.
-            // If we selected venue internally, go back to venue list.
-            if (widget.venueId == null) {
-              setState(() {
-                _currentVenueId = null;
-              });
-            } else {
-              Navigator.pop(context);
-            }
-          },
+          onPressed: _isProcessingPayment
+              ? null
+              : () {
+                  // If we came from external selection, pop.
+                  // If we selected venue internally, go back to venue list.
+                  if (widget.venueId == null) {
+                    setState(() {
+                      _currentVenueId = null;
+                    });
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
         ),
         title: Text(
           _currentVenueName ?? 'Book Slot',
@@ -837,209 +843,104 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Sport Selection Dropdown
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedSportId,
-                          hint: Text(
-                            'Select Sport',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                              color: Colors.grey.shade500,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Sport Selection Dropdown
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedSportId,
+                              hint: Text(
+                                'Select Sport',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                              isExpanded: true,
+                              icon: const Icon(Icons.keyboard_arrow_down),
+                              items: _sportsList.map((sport) {
+                                return DropdownMenuItem<String>(
+                                  value: sport['sport_id'].toString(),
+                                  child: Text(
+                                    sport['sport_name'] ?? 'Unknown',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedSportId = val;
+                                });
+                                _fetchAvailableSlots();
+                              },
                             ),
                           ),
-                          isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down),
-                          items: _sportsList.map((sport) {
-                            return DropdownMenuItem<String>(
-                              value: sport['sport_id'].toString(),
-                              child: Text(
-                                sport['sport_name'] ?? 'Unknown',
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedSportId = val;
-                            });
-                            _fetchAvailableSlots();
-                          },
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                    // Area Input
-                    _buildInputLabelField('Area', _areaController),
-                    const SizedBox(height: 16),
+                        // Area Input
+                        _buildInputLabelField('Area', _areaController),
+                        const SizedBox(height: 16),
 
-                    // Date Selection
-                    Text(
-                      'Select Date',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 80,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: 14, // 2 weeks
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(width: 12),
-                        itemBuilder: (context, index) {
-                          final date = DateTime.now().add(
-                            Duration(days: index),
-                          );
-                          final isSelected =
-                              date.day == _selectedDate.day &&
-                              date.month == _selectedDate.month &&
-                              date.year == _selectedDate.year;
-
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedDate = date;
-                                _fetchAvailableSlots();
-                              });
-                            },
-                            child: Container(
-                              width: 60,
-                              decoration: BoxDecoration(
-                                color: isSelected ? themeColor : Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? themeColor
-                                      : Colors.grey.shade300,
-                                ),
-                                boxShadow: isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color: themeColor.withOpacity(0.3),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ]
-                                    : [],
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    _getWeekday(date.weekday),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.grey.shade600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${date.day}',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.black87,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    // Select Slot Label
-                    Text(
-                      'Select Slot',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Time Slots
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: _isLoadingSlots
-                          ? [
-                              const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.all(20.0),
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                            ]
-                          : _slots.isEmpty
-                          ? [
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Text(
-                                  'No slots available',
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
-                            ]
-                          : _slots.map((slot) {
-                              final isSelected = _selectedSlot == slot;
-                              final slotPrice = _slotPrices[slot] ?? 0.0;
+                        // Date Selection
+                        Text(
+                          'Select Date',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 80,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: 14, // 2 weeks
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              final date = DateTime.now().add(
+                                Duration(days: index),
+                              );
+                              final isSelected =
+                                  date.day == _selectedDate.day &&
+                                  date.month == _selectedDate.month &&
+                                  date.year == _selectedDate.year;
 
                               return GestureDetector(
                                 onTap: () {
                                   setState(() {
-                                    _selectedSlot = slot;
+                                    _selectedDate = date;
+                                    _fetchAvailableSlots();
                                   });
-                                  _fetchPriceData();
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
+                                  width: 60,
                                   decoration: BoxDecoration(
                                     color: isSelected
                                         ? themeColor
@@ -1050,310 +951,469 @@ class _BookingScreenState extends State<BookingScreen> {
                                           ? themeColor
                                           : Colors.grey.shade300,
                                     ),
+                                    boxShadow: isSelected
+                                        ? [
+                                            BoxShadow(
+                                              color: themeColor.withOpacity(
+                                                0.3,
+                                              ),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ]
+                                        : [],
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        _getWeekday(date.weekday),
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${date.day}',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.black87,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(height: 30),
+
+                        // Select Slot Label
+                        Text(
+                          'Select Slot',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Time Slots
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: _isLoadingSlots
+                              ? [
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(20.0),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  ),
+                                ]
+                              : _slots.isEmpty
+                              ? [
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text(
+                                      'No slots available',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                ]
+                              : _slots.map((slot) {
+                                  final isSelected = _selectedSlot == slot;
+                                  final slotPrice = _slotPrices[slot] ?? 0.0;
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedSlot = slot;
+                                      });
+                                      _fetchPriceData();
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? themeColor
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? themeColor
+                                              : Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            slot,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : Colors.black87,
+                                            ),
+                                          ),
+                                          if (slotPrice > 0) ...[
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'INR ${slotPrice.toStringAsFixed(0)}',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                                color: isSelected
+                                                    ? Colors.white.withOpacity(
+                                                        0.9,
+                                                      )
+                                                    : Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                        ),
+
+                        // Price Breakdown Section - Only show if price data is loaded
+                        if (_selectedSlot != null &&
+                            !_isLoadingPrice &&
+                            _totalAmount > 0) ...[
+                          const SizedBox(height: 30),
+
+                          // Price Details Section
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade100),
+                            ),
+                            child: Column(
+                              children: [
+                                _buildPriceRow(
+                                  'Court Price',
+                                  'INR ${_courtPrice.toStringAsFixed(0)}',
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Total Amount Section
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.grey.shade900,
+                                  Colors.grey.shade800,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Total Amount',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _paymentMethod == PaymentMethod.online
+                                            ? 'Pay Online'
+                                            : 'Pay at Venue',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'INR ${_totalAmount.toStringAsFixed(1)}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                // Payment Method
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
                                   ),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        slot,
+                                        'Payment Method',
                                         style: GoogleFonts.poppins(
-                                          fontSize: 13,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w600,
-                                          color: isSelected
-                                              ? Colors.white
-                                              : Colors.black87,
                                         ),
                                       ),
-                                      if (slotPrice > 0) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'INR ${slotPrice.toStringAsFixed(0)}',
+                                      const SizedBox(height: 8),
+                                      RadioListTile<PaymentMethod>(
+                                        value: PaymentMethod.payAtVenue,
+                                        groupValue: _paymentMethod,
+                                        onChanged: (value) {
+                                          if (value == null) return;
+                                          setState(
+                                            () => _paymentMethod = value,
+                                          );
+                                        },
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(
+                                          'Pay at Venue',
                                           style: GoogleFonts.poppins(
-                                            fontSize: 11,
                                             fontWeight: FontWeight.w500,
-                                            color: isSelected
-                                                ? Colors.white.withOpacity(0.9)
-                                                : Colors.grey.shade600,
                                           ),
                                         ),
-                                      ],
+                                        subtitle: Text(
+                                          'Pay at the venue. Booking marked unpaid.',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      RadioListTile<PaymentMethod>(
+                                        value: PaymentMethod.online,
+                                        groupValue: _paymentMethod,
+                                        onChanged: _isRazorpayAvailable
+                                            ? (value) {
+                                                if (value == null) return;
+                                                setState(
+                                                  () => _paymentMethod = value,
+                                                );
+                                              }
+                                            : null,
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(
+                                          'Pay Online',
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          _isRazorpayAvailable
+                                              ? 'Pay now via Razorpay and confirm booking.'
+                                              : 'Online payment not available on web.',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_paymentMethod ==
+                                          PaymentMethod.online)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 8,
+                                          ),
+                                          child: SizedBox(
+                                            width: double.infinity,
+                                            child: OutlinedButton(
+                                              onPressed:
+                                                  !_isRazorpayAvailable ||
+                                                      _isProcessingPayment
+                                                  ? null
+                                                  : () async {
+                                                      await _startOnlinePayment(
+                                                        upiOnly: true,
+                                                      );
+                                                    },
+                                              style: OutlinedButton.styleFrom(
+                                                side: BorderSide(
+                                                  color: themeColor,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                'PAY VIA UPI',
+                                                style: GoogleFonts.poppins(
+                                                  fontWeight: FontWeight.w600,
+                                                  color: themeColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ),
-                              );
-                            }).toList(),
-                    ),
-
-                    // Price Breakdown Section - Only show if price data is loaded
-                    if (_selectedSlot != null &&
-                        !_isLoadingPrice &&
-                        _totalAmount > 0) ...[
-                      const SizedBox(height: 30),
-
-                      // Price Details Section
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade100),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildPriceRow(
-                              'Court Price',
-                              'INR ${_courtPrice.toStringAsFixed(0)}',
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Total Amount Section
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.grey.shade900,
-                              Colors.grey.shade800,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                        ],
+
+                        // Loading indicator for price
+                        if (_selectedSlot != null && _isLoadingPrice) ...[
+                          const SizedBox(height: 30),
+                          const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Next Button
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isProcessingPayment
+                          ? null
+                          : () async {
+                              if (_selectedSportId == null ||
+                                  _selectedSlot == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please select sport and slot',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (_paymentMethod == PaymentMethod.online) {
+                                await _startOnlinePayment();
+                              } else {
+                                setState(() => _isProcessingPayment = true);
+                                await _createBooking(payment: 'unpaid');
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: themeColor, // Use App Theme Color
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Total Amount',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    _paymentMethod == PaymentMethod.online
-                                        ? 'Pay Online'
-                                        : 'Pay at Venue',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'INR ${_totalAmount.toStringAsFixed(1)}',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Payment Method
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Payment Method',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  RadioListTile<PaymentMethod>(
-                                    value: PaymentMethod.payAtVenue,
-                                    groupValue: _paymentMethod,
-                                    onChanged: (value) {
-                                      if (value == null) return;
-                                      setState(() => _paymentMethod = value);
-                                    },
-                                    dense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(
-                                      'Pay at Venue',
-                                      style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      'Pay at the venue. Booking marked unpaid.',
-                                      style: GoogleFonts.poppins(fontSize: 12),
-                                    ),
-                                  ),
-                                  RadioListTile<PaymentMethod>(
-                                    value: PaymentMethod.online,
-                                    groupValue: _paymentMethod,
-                                    onChanged: _isRazorpayAvailable
-                                        ? (value) {
-                                            if (value == null) return;
-                                            setState(
-                                              () => _paymentMethod = value,
-                                            );
-                                          }
-                                        : null,
-                                    dense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(
-                                      'Pay Online',
-                                      style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      _isRazorpayAvailable
-                                          ? 'Pay now via Razorpay and confirm booking.'
-                                          : 'Online payment not available on web.',
-                                      style: GoogleFonts.poppins(fontSize: 12),
-                                    ),
-                                  ),
-                                  if (_paymentMethod == PaymentMethod.online)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton(
-                                          onPressed:
-                                              !_isRazorpayAvailable ||
-                                                  _isProcessingPayment
-                                              ? null
-                                              : () async {
-                                                  await _startOnlinePayment(
-                                                    upiOnly: true,
-                                                  );
-                                                },
-                                          style: OutlinedButton.styleFrom(
-                                            side: BorderSide(color: themeColor),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            'PAY VIA UPI',
-                                            style: GoogleFonts.poppins(
-                                              fontWeight: FontWeight.w600,
-                                              color: themeColor,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        _isProcessingPayment
+                            ? 'PROCESSING...'
+                            : _paymentMethod == PaymentMethod.online
+                            ? 'PAY & CONFIRM'
+                            : 'CONFIRM BOOKING',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
-                    ],
-
-                    // Loading indicator for price
-                    if (_selectedSlot != null && _isLoadingPrice) ...[
-                      const SizedBox(height: 30),
-                      const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_isProcessingPayment)
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: Colors.black.withOpacity(0.7),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Processing Booking...',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
             ),
-
-            // Next Button
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isProcessingPayment
-                      ? null
-                      : () async {
-                          if (_selectedSportId == null ||
-                              _selectedSlot == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please select sport and slot'),
-                              ),
-                            );
-                            return;
-                          }
-
-                          if (_paymentMethod == PaymentMethod.online) {
-                            await _startOnlinePayment();
-                          } else {
-                            await _createBooking(payment: 'unpaid');
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: themeColor, // Use App Theme Color
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    _isProcessingPayment
-                        ? 'PROCESSING...'
-                        : _paymentMethod == PaymentMethod.online
-                        ? 'PAY & CONFIRM'
-                        : 'CONFIRM BOOKING',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
