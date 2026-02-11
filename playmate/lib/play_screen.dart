@@ -114,6 +114,10 @@ class _PlayScreenState extends State<PlayScreen> {
               final address = item['address']?.toString();
               final joinedCount =
                   item['total_joined_player']?.toString() ?? '0';
+              final firstName = item['first_name']?.toString() ?? '';
+              final lastName = item['last_name']?.toString() ?? '';
+              final profileImage = item['profile_image']?.toString();
+
               return {
                 'sport': sportName,
                 'image': '',
@@ -124,6 +128,9 @@ class _PlayScreenState extends State<PlayScreen> {
                 'level': 'All Levels',
                 'isJoined': false,
                 'isCreated': false,
+                'user_name': '$firstName $lastName'.trim(),
+                'user_image': profileImage,
+                'created_at': item['created_at']?.toString(),
               };
             }).toList();
           });
@@ -163,6 +170,10 @@ class _PlayScreenState extends State<PlayScreen> {
               final venueName = item['venue_name']?.toString();
               final venueLocation = item['venue_location']?.toString();
               final joinedCount = item['total_players']?.toString() ?? '0';
+              final firstName = item['first_name']?.toString() ?? '';
+              final lastName = item['last_name']?.toString() ?? '';
+              final profileImage = item['profile_image']?.toString();
+
               return {
                 'sport': sportName,
                 'image': '',
@@ -173,6 +184,9 @@ class _PlayScreenState extends State<PlayScreen> {
                 'level': 'All Levels',
                 'isJoined': true,
                 'isCreated': false,
+                'user_name': '$firstName $lastName'.trim(),
+                'user_image': profileImage,
+                'created_at': item['created_at']?.toString(),
               };
             }).toList();
           });
@@ -219,6 +233,34 @@ class _PlayScreenState extends State<PlayScreen> {
               final address = item['address']?.toString();
               final joinedCount =
                   item['total_joined_player']?.toString() ?? '0';
+              final apiFirstName = item['first_name']?.toString() ?? '';
+              final apiLastName = item['last_name']?.toString() ?? '';
+              final apiImage = item['profile_image']?.toString() ?? '';
+              final apiCreatedAt = item['created_at']?.toString();
+
+              final prefsFirstName = prefs.getString('first_name');
+              final prefsLastName = prefs.getString('last_name');
+              final prefsImage = prefs.getString('profile_image');
+
+              final firstName = apiFirstName.isNotEmpty
+                  ? apiFirstName
+                  : (prefsFirstName != null && prefsFirstName.isNotEmpty
+                        ? prefsFirstName
+                        : 'You');
+
+              final lastName = apiLastName.isNotEmpty
+                  ? apiLastName
+                  : (prefsLastName ?? '');
+
+              final profileImage = apiImage.isNotEmpty
+                  ? apiImage
+                  : (prefsImage ?? '');
+
+              // Fallback to now if created_at is missing, to ensure "Just now" shows
+              // for newly created games if API doesn't return it immediately.
+              final createdAt =
+                  apiCreatedAt ?? DateTime.now().toIso8601String();
+
               return {
                 'sport': sportName,
                 'image': '',
@@ -229,6 +271,9 @@ class _PlayScreenState extends State<PlayScreen> {
                 'level': 'All Levels',
                 'isJoined': false,
                 'isCreated': true,
+                'user_name': '$firstName $lastName'.trim(),
+                'user_image': profileImage,
+                'created_at': createdAt,
               };
             }).toList();
           });
@@ -288,6 +333,27 @@ class _PlayScreenState extends State<PlayScreen> {
     } catch (e) {
       debugPrint('Error building filtered items: $e');
       return [];
+    }
+  }
+
+  String _timeAgo(String? dateString) {
+    if (dateString == null) return '';
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+
+      if (diff.inDays > 0) {
+        return '${diff.inDays}d ago';
+      } else if (diff.inHours > 0) {
+        return '${diff.inHours}h ago';
+      } else if (diff.inMinutes > 0) {
+        return '${diff.inMinutes}m ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (e) {
+      return '';
     }
   }
 
@@ -453,6 +519,71 @@ class _PlayScreenState extends State<PlayScreen> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
+                                        // User Profile (New)
+                                        if ((item['user_name'] ?? '')
+                                            .toString()
+                                            .isNotEmpty)
+                                          Row(
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 14,
+                                                backgroundColor:
+                                                    Colors.grey.shade200,
+                                                backgroundImage:
+                                                    (item['user_image'] !=
+                                                            null &&
+                                                        item['user_image']
+                                                            .toString()
+                                                            .isNotEmpty)
+                                                    ? NetworkImage(
+                                                        item['user_image']
+                                                            .toString(),
+                                                      )
+                                                    : null,
+                                                child:
+                                                    (item['user_image'] ==
+                                                            null ||
+                                                        item['user_image']
+                                                            .toString()
+                                                            .isEmpty)
+                                                    ? Icon(
+                                                        Icons.person,
+                                                        size: 16,
+                                                        color: Colors
+                                                            .grey
+                                                            .shade400,
+                                                      )
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    item['user_name'],
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Colors.black87,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    _timeAgo(
+                                                      item['created_at'],
+                                                    ),
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 10,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+
+                                        // Sport Tag
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 10,
