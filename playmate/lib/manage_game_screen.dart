@@ -314,11 +314,29 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                   const SizedBox(height: 24),
                   Divider(color: Colors.grey.shade100, height: 1),
                   const SizedBox(height: 24),
+                  Divider(color: Colors.grey.shade100, height: 1),
+                  const SizedBox(height: 24),
 
                   // Action Buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
+                      // Pay Button (only if unpaid)
+                      if (widget.gameData['payment_status'] == 'unpaid')
+                        _buildModernActionButton(
+                          icon: Icons.currency_rupee_rounded,
+                          label: 'Pay Now',
+                          color: Colors.red,
+                          isActive: true, // Highlighted
+                          onTap: () {
+                            // TODO: Integrate Payment Gateway
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Payment Gateway Coming Soon'),
+                              ),
+                            );
+                          },
+                        ),
                       _buildModernActionButton(
                         icon: Icons.settings_rounded,
                         label: 'Manage',

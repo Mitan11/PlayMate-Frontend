@@ -61,6 +61,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   // Price Data
   double _courtPrice = 0.0;
+  final double _convenienceFee = 50.0;
 
   double _totalAmount = 0.0;
   bool _isLoadingPrice = false;
@@ -136,6 +137,7 @@ class _BookingScreenState extends State<BookingScreen> {
       'razorpay_order_id': response.orderId,
       'razorpay_payment_id': response.paymentId,
       'razorpay_signature': response.signature,
+      "amount": _totalAmount,
     };
 
     _createBooking(payment: paymentData);
@@ -673,10 +675,10 @@ class _BookingScreenState extends State<BookingScreen> {
       }
 
       // Calculate total
-      double totalAmount = courtPrice;
+      double totalAmount = courtPrice + _convenienceFee;
 
       debugPrint(
-        'Selected Slot: $_selectedSlot, Court Price: $courtPrice, Total: $totalAmount',
+        'Selected Slot: $_selectedSlot, Court Price: $courtPrice, Fee: $_convenienceFee, Total: $totalAmount',
       );
 
       setState(() {
@@ -708,10 +710,12 @@ class _BookingScreenState extends State<BookingScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF3F8F3),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: widget.venueId == null
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                onPressed: () => Navigator.pop(context),
+              ),
         title: Text(
           'Select Venue',
           style: GoogleFonts.poppins(
@@ -1119,6 +1123,11 @@ class _BookingScreenState extends State<BookingScreen> {
                                   'Court Price',
                                   'INR ${_courtPrice.toStringAsFixed(0)}',
                                 ),
+                                const SizedBox(height: 8),
+                                _buildPriceRow(
+                                  'Convenience Fee',
+                                  'INR ${_convenienceFee.toStringAsFixed(0)}',
+                                ),
                               ],
                             ),
                           ),
@@ -1190,7 +1199,7 @@ class _BookingScreenState extends State<BookingScreen> {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      'INR ${_totalAmount.toStringAsFixed(1)}',
+                                      'INR ${_totalAmount.toStringAsFixed(0)}',
                                       style: GoogleFonts.poppins(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w700,
