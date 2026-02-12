@@ -42,12 +42,20 @@ class _PlayScreenState extends State<PlayScreen> {
       try {
         final List<dynamic> loadedGames = jsonDecode(createdGamesString);
         setState(() {
-          // Filter out existing created games to avoid duplicates if re-loading
+          // Merge loaded games with existing API data
           _createdPlayItems ??= [];
-          _createdPlayItems!.removeWhere((item) => item['isCreated'] == true);
+          final existingIds = _createdPlayItems!
+              .map((item) => item['booking_id'])
+              .where((id) => id != null)
+              .toSet();
 
-          // Add loaded games
-          _createdPlayItems!.addAll(loadedGames.cast<Map<String, dynamic>>());
+          for (var game in loadedGames) {
+            final gameMap = Map<String, dynamic>.from(game);
+            // Only add if not already present
+            if (!existingIds.contains(gameMap['booking_id'])) {
+              _createdPlayItems!.add(gameMap);
+            }
+          }
         });
       } catch (e) {
         debugPrint('Error loading created games: $e');
@@ -274,6 +282,7 @@ class _PlayScreenState extends State<PlayScreen> {
                 'user_name': '$firstName $lastName'.trim(),
                 'user_image': profileImage,
                 'created_at': createdAt,
+                'booking_id': item['booking_id'],
               };
             }).toList();
           });
