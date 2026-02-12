@@ -139,6 +139,8 @@ class _PlayScreenState extends State<PlayScreen> {
                 'user_name': '$firstName $lastName'.trim(),
                 'user_image': profileImage,
                 'created_at': item['created_at']?.toString(),
+                'game_id': item['game_id'],
+                'status': item['status'],
               };
             }).toList();
           });
@@ -283,6 +285,8 @@ class _PlayScreenState extends State<PlayScreen> {
                 'user_image': profileImage,
                 'created_at': createdAt,
                 'booking_id': item['booking_id'],
+                'payment_status': item['payment_status'],
+                'total_price': item['total_price'],
               };
             }).toList();
           });
@@ -298,6 +302,74 @@ class _PlayScreenState extends State<PlayScreen> {
       debugPrint('Error loading created games: $e');
     } finally {
       setState(() => _isLoadingCreatedGames = false);
+    }
+  }
+
+  Future<void> _joinGame(Map<String, dynamic> item) async {
+    final gameId = item['game_id'];
+    if (gameId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error: Game ID not found')));
+      return;
+    }
+
+    // Optimistic update
+    final oldStatus = item['status'];
+    setState(() {
+      item['status'] = 'Pending';
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
+      final base = dotenv.env['BASE_URL'] ?? '';
+
+      if (token == null || userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login to join games')),
+        );
+        return;
+      }
+
+      final uri = Uri.parse('$base/user/joinGame/$userId/$gameId');
+
+      final resp = await http.post(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Joined game successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Refresh all data
+        await _fetchJoinedGames();
+        await _fetchAllGames();
+      } else {
+        setState(() {
+          item['status'] = oldStatus;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to join: ${resp.body}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error joining game: $e');
+      setState(() {
+        item['status'] = oldStatus;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -363,6 +435,22 @@ class _PlayScreenState extends State<PlayScreen> {
       }
     } catch (e) {
       return '';
+    }
+  }
+
+  Color _getStatusColor(String? status) {
+    if (status?.toLowerCase() == 'paid') return Colors.green;
+    if (status?.toLowerCase() == 'unpaid') return Colors.red;
+
+    switch (status?.toLowerCase()) {
+      case 'approved':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -592,6 +680,93 @@ class _PlayScreenState extends State<PlayScreen> {
                                             ],
                                           ),
 
+                                        // Status Tag
+                                        if (item['status'] != null)
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              right: 8,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: _getStatusColor(
+                                                item['status'],
+                                              ).withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: _getStatusColor(
+                                                  item['status'],
+                                                ),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              item['status'].toString(),
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: _getStatusColor(
+                                                  item['status'],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+
+                                        // Payment Status Tag for Created Games
+                                        if (item['isCreated'] == true &&
+                                            item['payment_status'] != null) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  (item['payment_status']
+                                                                  .toString()
+                                                                  .toLowerCase() ==
+                                                              'paid'
+                                                          ? Colors.green
+                                                          : Colors.red)
+                                                      .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color:
+                                                    item['payment_status']
+                                                            .toString()
+                                                            .toLowerCase() ==
+                                                        'paid'
+                                                    ? Colors.green
+                                                    : Colors.red,
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              item['payment_status']
+                                                  .toString()
+                                                  .toUpperCase(),
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color:
+                                                    item['payment_status']
+                                                            .toString()
+                                                            .toLowerCase() ==
+                                                        'paid'
+                                                    ? Colors.green
+                                                    : Colors.red,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+
+                                        const SizedBox(width: 8),
+
                                         // Sport Tag
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -669,103 +844,105 @@ class _PlayScreenState extends State<PlayScreen> {
                                           ),
                                         ),
 
-                                        if (item['isCreated'] == true)
-                                          OutlinedButton(
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      ManageGameScreen(
-                                                        gameData: item,
-                                                      ),
+                                        if (item['status']
+                                                ?.toString()
+                                                .toLowerCase() !=
+                                            'pending')
+                                          if (item['isCreated'] == true)
+                                            OutlinedButton(
+                                              onPressed: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        ManageGameScreen(
+                                                          gameData: item,
+                                                        ),
+                                                  ),
+                                                );
+                                              },
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: themeColor,
+                                                side: BorderSide(
+                                                  color: themeColor,
                                                 ),
-                                              );
-                                            },
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: themeColor,
-                                              side: BorderSide(
-                                                color: themeColor,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 20,
+                                                      vertical: 0,
+                                                    ),
+                                                minimumSize: const Size(0, 36),
                                               ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
+                                              child: Text(
+                                                'Manage',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 20,
-                                                    vertical: 0,
-                                                  ),
-                                              minimumSize: const Size(0, 36),
-                                            ),
-                                            child: Text(
-                                              'Manage',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
+                                            )
+                                          else if (item['isJoined'] == true)
+                                            OutlinedButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  item['isJoined'] = false;
+                                                });
+                                              },
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: Colors.red,
+                                                side: const BorderSide(
+                                                  color: Colors.red,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 20,
+                                                      vertical: 0,
+                                                    ),
+                                                minimumSize: const Size(0, 36),
                                               ),
-                                            ),
-                                          )
-                                        else if (item['isJoined'] == true)
-                                          OutlinedButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                item['isJoined'] = false;
-                                              });
-                                            },
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: Colors.red,
-                                              side: const BorderSide(
-                                                color: Colors.red,
+                                              child: Text(
+                                                'Leave',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
+                                            )
+                                          else
+                                            ElevatedButton(
+                                              onPressed: () {
+                                                _joinGame(item);
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: themeColor,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 20,
+                                                      vertical: 0,
+                                                    ),
+                                                minimumSize: const Size(0, 36),
                                               ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 20,
-                                                    vertical: 0,
-                                                  ),
-                                              minimumSize: const Size(0, 36),
-                                            ),
-                                            child: Text(
-                                              'Leave',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          )
-                                        else
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                item['isJoined'] = true;
-                                              });
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: themeColor,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 20,
-                                                    vertical: 0,
-                                                  ),
-                                              minimumSize: const Size(0, 36),
-                                            ),
-                                            child: Text(
-                                              'Join',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 13,
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w600,
+                                              child: Text(
+                                                'Join',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 13,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
                                             ),
-                                          ),
                                       ],
                                     ),
                                   ],
