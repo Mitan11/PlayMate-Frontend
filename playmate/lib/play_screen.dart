@@ -32,35 +32,8 @@ class _PlayScreenState extends State<PlayScreen> {
     _selectedFilter = widget.initialFilter;
     _fetchAllSports();
     _fetchAllGames();
-    _loadCreatedGames(); // Load saved games
-  }
-
-  Future<void> _loadCreatedGames() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? createdGamesString = prefs.getString('created_games');
-    if (createdGamesString != null) {
-      try {
-        final List<dynamic> loadedGames = jsonDecode(createdGamesString);
-        setState(() {
-          // Merge loaded games with existing API data
-          _createdPlayItems ??= [];
-          final existingIds = _createdPlayItems!
-              .map((item) => item['booking_id'])
-              .where((id) => id != null)
-              .toSet();
-
-          for (var game in loadedGames) {
-            final gameMap = Map<String, dynamic>.from(game);
-            // Only add if not already present
-            if (!existingIds.contains(gameMap['booking_id'])) {
-              _createdPlayItems!.add(gameMap);
-            }
-          }
-        });
-      } catch (e) {
-        debugPrint('Error loading created games: $e');
-      }
-    }
+    _fetchJoinedGames();
+    _fetchCreatedGames();
   }
 
   Future<void> _fetchAllSports() async {
@@ -197,6 +170,7 @@ class _PlayScreenState extends State<PlayScreen> {
                 'user_name': '$firstName $lastName'.trim(),
                 'user_image': profileImage,
                 'created_at': item['created_at']?.toString(),
+                'game_id': item['game_id'] ?? item['booking_id'],
               };
             }).toList();
           });
@@ -221,6 +195,7 @@ class _PlayScreenState extends State<PlayScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
       final base = dotenv.env['BASE_URL'] ?? '';
+
       final uri = Uri.parse('$base/user/usersCreatedGames');
       final resp = await http.get(
         uri,
@@ -232,6 +207,7 @@ class _PlayScreenState extends State<PlayScreen> {
         final rows =
             (data is Map<String, dynamic> ? data['data'] : data)
                 as List<dynamic>?;
+
         if (rows != null) {
           setState(() {
             _createdPlayItems = rows.map((row) {
@@ -240,42 +216,18 @@ class _PlayScreenState extends State<PlayScreen> {
               );
               final sportName = item['sport_name']?.toString() ?? 'Unknown';
               final venueName = item['venue_name']?.toString();
-              final address = item['address']?.toString();
-              final joinedCount =
-                  item['total_joined_player']?.toString() ?? '0';
-              final apiFirstName = item['first_name']?.toString() ?? '';
-              final apiLastName = item['last_name']?.toString() ?? '';
-              final apiImage = item['profile_image']?.toString() ?? '';
-              final apiCreatedAt = item['created_at']?.toString();
-
-              final prefsFirstName = prefs.getString('first_name');
-              final prefsLastName = prefs.getString('last_name');
-              final prefsImage = prefs.getString('profile_image');
-
-              final firstName = apiFirstName.isNotEmpty
-                  ? apiFirstName
-                  : (prefsFirstName != null && prefsFirstName.isNotEmpty
-                        ? prefsFirstName
-                        : 'You');
-
-              final lastName = apiLastName.isNotEmpty
-                  ? apiLastName
-                  : (prefsLastName ?? '');
-
-              final profileImage = apiImage.isNotEmpty
-                  ? apiImage
-                  : (prefsImage ?? '');
-
-              // Fallback to now if created_at is missing, to ensure "Just now" shows
-              // for newly created games if API doesn't return it immediately.
-              final createdAt =
-                  apiCreatedAt ?? DateTime.now().toIso8601String();
+              final venueLocation = item['venue_location']?.toString();
+              final joinedCount = item['total_players']?.toString() ?? '0';
+              final firstName = item['first_name']?.toString() ?? '';
+              final lastName = item['last_name']?.toString() ?? '';
+              final profileImage = item['profile_image']?.toString();
+              final createdAt = item['created_at']?.toString();
 
               return {
                 'sport': sportName,
                 'image': '',
                 'title': '$sportName Game',
-                'location': venueName ?? address ?? 'Unknown',
+                'location': venueName ?? venueLocation ?? 'Unknown',
                 'distance': 'N/A',
                 'players': joinedCount,
                 'level': 'All Levels',
@@ -285,18 +237,25 @@ class _PlayScreenState extends State<PlayScreen> {
                 'user_image': profileImage,
                 'created_at': createdAt,
                 'booking_id': item['booking_id'],
+                'game_id': item['game_id'],
                 'payment_status': item['payment_status'],
                 'total_price': item['total_price'],
+                'status': item['game_status'],
               };
             }).toList();
+
+            // Optional: Sort by created_at descending
+            _createdPlayItems!.sort((a, b) {
+              final da =
+                  DateTime.tryParse(a['created_at'].toString()) ??
+                  DateTime.now();
+              final db =
+                  DateTime.tryParse(b['created_at'].toString()) ??
+                  DateTime.now();
+              return db.compareTo(da); // Descending
+            });
           });
-        } else {
-          debugPrint('Created games: data is null or not a list');
         }
-      } else {
-        debugPrint(
-          'Created games request failed: ${resp.statusCode} ${resp.body}',
-        );
       }
     } catch (e) {
       debugPrint('Error loading created games: $e');
@@ -367,6 +326,69 @@ class _PlayScreenState extends State<PlayScreen> {
       setState(() {
         item['status'] = oldStatus;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _leaveGame(Map<String, dynamic> item) async {
+    final gameId = item['game_id'];
+    if (gameId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error: Game ID not found')));
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
+      final base = dotenv.env['BASE_URL'] ?? '';
+
+      if (token == null || userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login to leave games')),
+        );
+        return;
+      }
+
+      final uri = Uri.parse('$base/user/leaveGame/$userId/$gameId');
+
+      final resp = await http.delete(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Left game successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        setState(() {
+          item['isJoined'] = false;
+        });
+
+        // Refresh data
+        if (_selectedFilter == 'Joined') {
+          await _fetchJoinedGames();
+        } else {
+          await _fetchAllGames();
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to leave: ${resp.body}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error leaving game: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
@@ -550,7 +572,6 @@ class _PlayScreenState extends State<PlayScreen> {
                 } else {
                   await _fetchAllGames();
                 }
-                await _loadCreatedGames(); // Reload games on refresh
                 // Simulate data reload for matches
                 await Future.delayed(const Duration(milliseconds: 500));
                 setState(() {}); // Refresh UI
@@ -888,9 +909,7 @@ class _PlayScreenState extends State<PlayScreen> {
                                           else if (item['isJoined'] == true)
                                             OutlinedButton(
                                               onPressed: () {
-                                                setState(() {
-                                                  item['isJoined'] = false;
-                                                });
+                                                _leaveGame(item);
                                               },
                                               style: OutlinedButton.styleFrom(
                                                 foregroundColor: Colors.red,
