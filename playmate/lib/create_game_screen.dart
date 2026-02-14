@@ -283,15 +283,6 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                                       ? themeColor
                                       : Colors.grey.shade300,
                                 ),
-                                boxShadow: isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color: themeColor.withOpacity(0.3),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ]
-                                    : [],
                               ),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,

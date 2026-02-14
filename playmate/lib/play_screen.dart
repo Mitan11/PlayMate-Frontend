@@ -729,9 +729,6 @@ class _PlayScreenState extends State<PlayScreen> {
                                               style: GoogleFonts.poppins(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w600,
-                                                color: _getStatusColor(
-                                                  item['status'],
-                                                ),
                                               ),
                                             ),
                                           ),
@@ -935,7 +932,14 @@ class _PlayScreenState extends State<PlayScreen> {
                                                 ),
                                               ),
                                             )
-                                          else
+                                          else if ((item['status']
+                                                      ?.toString()
+                                                      .toLowerCase() !=
+                                                  'rejected') &&
+                                              (item['request_status']
+                                                      ?.toString()
+                                                      .toLowerCase() !=
+                                                  'rejected'))
                                             ElevatedButton(
                                               onPressed: () {
                                                 _joinGame(item);

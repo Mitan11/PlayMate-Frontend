@@ -341,8 +341,14 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
     // Extract dynamic data or defaults
     final String sportName = widget.gameData['sport'] ?? 'Sport';
     final String playersCount = widget.gameData['players'] ?? '1/4';
-    final String level = widget.gameData['level'] ?? 'Open';
+    // level variable removed as requested
     final themeColor = const Color(0xFF2E7D32);
+
+    final displayUserName = widget.gameData['user_name'] ?? _userName;
+    final displayUserImage = widget.gameData['user_image'];
+    final displayInitial = displayUserName.isNotEmpty
+        ? displayUserName[0].toUpperCase()
+        : _userInitial;
 
     return Stack(
       children: [
@@ -455,6 +461,161 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
 
                   const SizedBox(height: 24),
 
+                  // Schedule & Price Card
+                  if (widget.gameData['date'] != null ||
+                      widget.gameData['time'] != null)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blueGrey.withOpacity(0.08),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Game Schedule',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Date
+                          if (widget.gameData['date'] != null)
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.purple.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.calendar_today_rounded,
+                                    color: Colors.purple.shade700,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      widget.gameData['date'],
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Date',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          if (widget.gameData['time'] != null) ...[
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.access_time_rounded,
+                                    color: Colors.orange.shade700,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      widget.gameData['time'],
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Time',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (widget.gameData['total_price'] != null) ...[
+                            const SizedBox(height: 16),
+                            Divider(color: Colors.grey.shade100),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.attach_money_rounded,
+                                    color: Colors.green.shade700,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '₹${widget.gameData['total_price']}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Total Price',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 24),
+
                   // Main Card
                   Container(
                     padding: const EdgeInsets.all(24),
@@ -511,6 +672,14 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                                   end: Alignment.bottomRight,
                                 ),
                                 shape: BoxShape.circle,
+                                image:
+                                    (displayUserImage != null &&
+                                        displayUserImage.toString().isNotEmpty)
+                                    ? DecorationImage(
+                                        image: NetworkImage(displayUserImage),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.blue.withOpacity(0.3),
@@ -520,14 +689,18 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                                 ],
                               ),
                               alignment: Alignment.center,
-                              child: Text(
-                                _userInitial,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                              child:
+                                  (displayUserImage != null &&
+                                      displayUserImage.toString().isNotEmpty)
+                                  ? null
+                                  : Text(
+                                      displayInitial,
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -538,7 +711,7 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                                     children: [
                                       Flexible(
                                         child: Text(
-                                          _userName,
+                                          displayUserName,
                                           style: GoogleFonts.poppins(
                                             fontWeight: FontWeight.w700,
                                             fontSize: 16,
@@ -581,10 +754,6 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                                     runSpacing: 8,
                                     children: [
                                       _buildInfoBadge(
-                                        level.toUpperCase(),
-                                        themeColor,
-                                      ),
-                                      _buildInfoBadge(
                                         sportName.toUpperCase(),
                                         Colors.orange,
                                       ),
@@ -618,7 +787,7 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                                 },
                               ),
                             _buildModernActionButton(
-                              icon: Icons.settings_rounded,
+                              icon: Icons.manage_accounts,
                               label: 'Manage',
                               color: themeColor,
                               isActive: true,
@@ -634,7 +803,7 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                               },
                             ),
                             _buildModernActionButton(
-                              icon: Icons.arrow_forward_rounded,
+                              icon: Icons.group,
                               label: 'All Players',
                               color: Colors.orange.shade600,
                               onTap: () {
@@ -732,15 +901,6 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                 color: isActive ? color.withOpacity(0.3) : Colors.grey.shade200,
                 width: 1.5,
               ),
-              boxShadow: isActive
-                  ? [
-                      BoxShadow(
-                        color: color.withOpacity(0.15),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : [],
             ),
             child: Icon(
               icon,
