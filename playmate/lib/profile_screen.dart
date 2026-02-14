@@ -1246,17 +1246,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            (_likedPosts[index] == true) ? 'Liked' : 'Like',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: (_likedPosts[index] == true)
-                                  ? Colors.red
-                                  : Colors.grey.shade500,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
                             '${_postLikes[index] ?? 0}',
                             style: GoogleFonts.poppins(
                               fontSize: 13,
