@@ -414,6 +414,7 @@ class _BookingScreenState extends State<BookingScreen> {
           'isJoined': false,
           'isCreated': true,
           'booking_id': responseData['data']?['booking_id'],
+          'created_at': DateTime.now().toIso8601String(),
         };
 
         final String? existingGamesString = prefs.getString('created_games');
