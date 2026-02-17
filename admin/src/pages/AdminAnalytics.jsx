@@ -17,6 +17,9 @@ import Skeleton from "@mui/joy/Skeleton";
 import Preloader from "../components/Preloader";
 import Grid from "@mui/joy/Grid";
 import Divider from "@mui/joy/Divider";
+import Modal from "@mui/joy/Modal";
+import ModalDialog from "@mui/joy/ModalDialog";
+import Button from "@mui/joy/Button";
 
 function AdminAnalytics() {
     const { backendUrl, aToken } = useContext(AppContext);
@@ -39,6 +42,10 @@ function AdminAnalytics() {
     const [topUsersByBookingsData, setTopUsersByBookingsData] = useState([]);
     const [mostLikedPostsData, setMostLikedPostsData] = useState([]);
     const [topContentCreatorsData, setTopContentCreatorsData] = useState([]);
+    
+    // Modal state for post details
+    const [selectedPost, setSelectedPost] = useState(null);
+    const [modalOpen, setModalOpen] = useState(false);
 
     const [loading, setLoading] = useState(true);
 
@@ -176,6 +183,18 @@ function AdminAnalytics() {
             date: k,
             value: map[k]
         }));
+    };
+
+    // Handle post click to show details
+    const handlePostClick = (post) => {
+        setSelectedPost(post);
+        setModalOpen(true);
+    };
+
+    // Handle modal close
+    const handleCloseModal = () => {
+        setModalOpen(false);
+        setSelectedPost(null);
     };
 
     if (loading) {
@@ -468,7 +487,25 @@ function AdminAnalytics() {
                         {mostLikedPostsData && mostLikedPostsData.length > 0 ? (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                 {mostLikedPostsData.map((post, index) => (
-                                    <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'background.level1', borderRadius: 'sm' }}>
+                                    <Box 
+                                        key={index} 
+                                        onClick={() => handlePostClick(post)}
+                                        sx={{ 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'center', 
+                                            p: 1, 
+                                            bgcolor: 'background.level1', 
+                                            borderRadius: 'sm',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': {
+                                                bgcolor: 'background.level2',
+                                                boxShadow: 'sm',
+                                                transform: 'translateY(-2px)'
+                                            }
+                                        }}
+                                    >
                                         <Typography level="body-sm">
                                             {post.first_name} {post.last_name}
                                         </Typography>
@@ -567,6 +604,87 @@ function AdminAnalytics() {
                     )}
                 </>
             )}
+
+            {/* Modal for Post Details */}
+            <Modal 
+                open={modalOpen} 
+                onClose={handleCloseModal}
+                sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+            >
+                <ModalDialog
+                    layout="center"
+                    size="md"
+                    sx={{ 
+                        maxWidth: 600,
+                        borderRadius: 'md',
+                        p: 3
+                    }}
+                >
+                    <Box sx={{ mb: 2 }}>
+                        <Typography level="h3" sx={{ mb: 2 }}>
+                            {selectedPost?.first_name} {selectedPost?.last_name}'s Post
+                        </Typography>
+                        <Divider />
+                    </Box>
+
+                    {selectedPost && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {/* Post Content */}
+                            <Box>
+                                <Typography level="body-sm" sx={{ color: 'neutral.600', mb: 1 }}>
+                                    <strong>Content:</strong>
+                                </Typography>
+                                <Typography level="body-md" sx={{ p: 1.5, bgcolor: 'background.level1', borderRadius: 'sm' }}>
+                                    {selectedPost.text_content || 'No content available'}
+                                </Typography>
+                            </Box>
+
+                            {/* Post Media */}
+                            {selectedPost.media_url && (
+                                <Box>
+                                    <Typography level="body-sm" sx={{ color: 'neutral.600', mb: 1 }}>
+                                        <strong>Media:</strong>
+                                    </Typography>
+                                    <Box
+                                        component="img"
+                                        src={selectedPost.media_url}
+                                        alt="Post media"
+                                        sx={{
+                                            maxWidth: '100%',
+                                            height: 'auto',
+                                            borderRadius: 'sm',
+                                            maxHeight: 300
+                                        }}
+                                    />
+                                </Box>
+                            )}
+
+                            {/* Created Date */}
+                            <Box>
+                                <Typography level="body-sm" sx={{ color: 'neutral.600', mb: 1 }}>
+                                    <strong>Posted on:</strong>
+                                </Typography>
+                                <Typography level="body-md">
+                                    {selectedPost.created_at ? new Date(selectedPost.created_at).toLocaleString() : 'Unknown'}
+                                </Typography>
+                            </Box>
+
+                            {/* Like Count */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'danger.softBg', p: 1.5, borderRadius: 'sm' }}>
+                                <Typography level="body-md">
+                                    ❤️ {selectedPost.likes} {selectedPost.likes === 1 ? 'like' : 'likes'}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    )}
+
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
+                        <Button variant="plain" color="neutral" onClick={handleCloseModal}>
+                            Close
+                        </Button>
+                    </Box>
+                </ModalDialog>
+            </Modal>
         </Box>
     );
 }
