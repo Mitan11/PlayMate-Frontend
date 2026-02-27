@@ -35,6 +35,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Map<String, dynamic>> _recentActivities = [];
   bool _isLoadingActivities = true;
+  bool _isLoadingMore = false;
+  bool _hasNextPage = true;
+  int _currentPage = 1;
+  final int _pageSize = 10;
+  final ScrollController _homeScrollController = ScrollController();
 
   StreamSubscription? _postUpdateSubscription;
 
@@ -43,7 +48,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _selectedIndex = widget.initialIndex;
     _loadUserData();
-    _loadRecentActivities();
+    _loadRecentActivities(reset: true);
+
+    _homeScrollController.addListener(_onHomeScroll);
 
     _postUpdateSubscription = PostState().onPostUpdate.listen((update) {
       if (!mounted) return;
@@ -64,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _welcomeTimer?.cancel();
     _postUpdateSubscription?.cancel();
+    _homeScrollController.dispose();
     super.dispose();
   }
 
@@ -95,8 +103,19 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _loadRecentActivities() async {
-    setState(() => _isLoadingActivities = true);
+  Future<void> _loadRecentActivities({bool reset = false}) async {
+    if (reset) {
+      _currentPage = 1;
+      _hasNextPage = true;
+      setState(() {
+        _isLoadingActivities = true;
+        _recentActivities = [];
+      });
+    } else {
+      if (_isLoadingMore || !_hasNextPage) return;
+      setState(() => _isLoadingMore = true);
+    }
+
     try {
       final base = dotenv.env['BASE_URL'] ?? '';
       final prefs = await SharedPreferences.getInstance();
@@ -109,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       final uri = Uri.parse(
-        '$base/user/recentActivities/$userId?page=1&limit=10',
+        '$base/user/recentActivities/$userId?page=$_currentPage&limit=$_pageSize',
       );
       final resp = await http.get(
         uri,
@@ -123,21 +142,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        // data structure: { data: { posts: [...] } }
+        List<Map<String, dynamic>> newItems = [];
         if (data['data'] != null && data['data']['posts'] != null) {
-          setState(() {
-            _recentActivities = List<Map<String, dynamic>>.from(
-              data['data']['posts'],
-            );
-          });
+          newItems = List<Map<String, dynamic>>.from(data['data']['posts']);
         } else if (data['data'] is List) {
-          // Fallback if it returns a direct list
-          setState(() {
-            _recentActivities = List<Map<String, dynamic>>.from(data['data']);
-          });
-        } else {
-          setState(() => _recentActivities = []);
+          newItems = List<Map<String, dynamic>>.from(data['data']);
         }
+
+        final pagination = data['data']?['pagination'];
+        final bool nextFromApi = pagination is Map
+            ? (pagination['has_next'] == true)
+            : newItems.length == _pageSize;
+
+        setState(() {
+          _recentActivities.addAll(newItems);
+          _hasNextPage = nextFromApi;
+          if (newItems.isNotEmpty) {
+            _currentPage += 1;
+          }
+        });
       } else {
         debugPrint('Failed to load activities: ${resp.statusCode}');
       }
@@ -145,8 +168,20 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('Error loading recent activities: $e');
     } finally {
       if (mounted) {
-        setState(() => _isLoadingActivities = false);
+        setState(() {
+          _isLoadingActivities = false;
+          _isLoadingMore = false;
+        });
       }
+    }
+  }
+
+  void _onHomeScroll() {
+    if (_selectedIndex != 0) return;
+    if (!_homeScrollController.hasClients) return;
+    final position = _homeScrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      _loadRecentActivities();
     }
   }
 
@@ -318,11 +353,12 @@ class _HomeScreenState extends State<HomeScreen> {
       onRefresh: () async {
         await Future.wait([
           _loadUserData(isRefresh: true),
-          _loadRecentActivities(),
+          _loadRecentActivities(reset: true),
         ]);
       },
       color: themeColor,
       child: SingleChildScrollView(
+        controller: _homeScrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,6 +403,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 itemBuilder: (context, index) {
                   return _buildActivityItem(index);
                 },
+              ),
+
+            if (!_isLoadingActivities && _recentActivities.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: _hasNextPage
+                      ? (_isLoadingMore
+                          ? CircularProgressIndicator(color: themeColor)
+                          : const SizedBox.shrink())
+                      : Text(
+                          'Game over.....for now',
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey.shade600,
+                            fontSize: 13,
+                          ),
+                        ),
+                ),
               ),
 
             const SizedBox(height: 80),
