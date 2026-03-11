@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1045858257918",
+    "project_id": "push-notification-d3398",
+    "storage_bucket": "push-notification-d3398.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1045858257918:android:489cd606c1cfa47c82ceaf",
+        "android_client_info": {
+          "package_name": "com.PushNotification.playMate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3nSm9omB0IC5Xn6Io8VY1t6uqRm2OC28"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

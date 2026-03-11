@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:playmate/notification_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:playmate/login_screen.dart';
 import 'package:playmate/profile_screen.dart';
@@ -43,13 +44,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   StreamSubscription? _postUpdateSubscription;
 
+  int _notificationCount = 0;
+
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
     _loadUserData();
     _loadRecentActivities(reset: true);
-
+    _fetchNotificationCount();
+  
     _homeScrollController.addListener(_onHomeScroll);
 
     _postUpdateSubscription = PostState().onPostUpdate.listen((update) {
@@ -65,6 +69,41 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     });
+  }
+
+  Future<void> _fetchNotificationCount() async {
+    try {
+      final base = dotenv.env['BASE_URL'] ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
+      if (token == null || userId == null) {
+        setState(() => _notificationCount = 0);
+        return;
+      }
+      final uri = Uri.parse('$base/user/notifications/all');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data['data'] != null && data['data']['notifications'] != null) {
+          final notifications = List<Map<String, dynamic>>.from(data['data']['notifications']);
+          final unread = notifications.where((n) => n['notification_status'] == 0).length;
+          setState(() => _notificationCount = unread);
+        } else {
+          setState(() => _notificationCount = 0);
+        }
+      } else {
+        setState(() => _notificationCount = 0);
+      }
+    } catch (_) {
+      setState(() => _notificationCount = 0);
+    }
   }
 
   @override
@@ -255,9 +294,44 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
           ),
-          IconButton(
-            icon: Icon(Icons.notifications_outlined, color: themeColor),
-            onPressed: () {},
+          Stack(
+            children: [
+              IconButton(
+                icon: Icon(Icons.notifications_outlined, color: themeColor),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => NotificationScreen()),
+                  );
+                  _fetchNotificationCount();
+                },
+              ),
+              if (_notificationCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$_notificationCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -411,8 +485,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Center(
                   child: _hasNextPage
                       ? (_isLoadingMore
-                          ? CircularProgressIndicator(color: themeColor)
-                          : const SizedBox.shrink())
+                            ? CircularProgressIndicator(color: themeColor)
+                            : const SizedBox.shrink())
                       : Text(
                           'Game over.....for now',
                           style: GoogleFonts.poppins(

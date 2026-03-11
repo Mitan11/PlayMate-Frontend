@@ -1,4 +1,4 @@
-package com.example.playmate
+package com.PushNotification.playMate
 
 import io.flutter.embedding.android.FlutterActivity
 
