@@ -18,6 +18,106 @@ class ManageGameScreen extends StatefulWidget {
 }
 
 class _ManageGameScreenState extends State<ManageGameScreen> {
+  Future<void> _cancelBooking() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Booking'),
+        content: const Text(
+          'Are you sure you want to cancel this booking? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final bookingId = widget.gameData['booking_id'];
+    final gameId = widget.gameData['game_id'];
+    if (bookingId == null || gameId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Booking ID or Game ID not found')),
+      );
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final base = dotenv.env['BASE_URL'] ?? '';
+    final uri = Uri.parse('$base/user/cancelBooking');
+    try {
+      final resp = await http.post(
+        uri,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'booking_id': bookingId, 'game_id': gameId}),
+      );
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking cancelled successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        String errorMsg = 'Failed to cancel booking.';
+        try {
+          final body = jsonDecode(resp.body);
+          if (body['message'] != null) {
+            errorMsg = body['message'];
+          }
+        } catch (_) {
+          errorMsg = 'Failed to cancel: ${resp.body}';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  String _formatDateTime(String? dateTimeStr) {
+    if (dateTimeStr == null) return '';
+    final dt = DateTime.tryParse(dateTimeStr);
+    if (dt == null) return '';
+    final months = [
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final hour = dt.hour > 12
+        ? dt.hour - 12
+        : dt.hour == 0
+        ? 12
+        : dt.hour;
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '${months[dt.month]} ${dt.day}, $hour:$min $ampm';
+  }
+
   String _userName = 'Player';
   String _userInitial = 'P';
   Razorpay? _razorpay;
@@ -25,7 +125,7 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
   final bool _isRazorpayAvailable = !kIsWeb;
   // ignore: unused_field
   double _courtPrice = 0.0;
-  final double _convenienceFee = 50.0;
+  // Convenience fee removed
   double _lastPaymentAmount = 0.0;
 
   @override
@@ -268,7 +368,7 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
     }
 
     _courtPrice = courtPrice;
-    final totalAmount = courtPrice + _convenienceFee;
+    final totalAmount = courtPrice;
     _lastPaymentAmount = totalAmount;
 
     if (totalAmount <= 0) {
@@ -461,9 +561,9 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Schedule & Price Card
-                  if (widget.gameData['date'] != null ||
-                      widget.gameData['time'] != null)
+                  // Schedule & Price Card (show using start_datetime and end_datetime if present)
+                  if (widget.gameData['start_datetime'] != null &&
+                      widget.gameData['end_datetime'] != null)
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
@@ -489,85 +589,43 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          // Date
-                          if (widget.gameData['date'] != null)
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.purple.withOpacity(0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.calendar_today_rounded,
-                                    color: Colors.purple.shade700,
-                                    size: 20,
-                                  ),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.withOpacity(0.1),
+                                  shape: BoxShape.circle,
                                 ),
-                                const SizedBox(width: 16),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      widget.gameData['date'],
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Date',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                    ),
-                                  ],
+                                child: Icon(
+                                  Icons.calendar_today_rounded,
+                                  color: Colors.purple.shade700,
+                                  size: 20,
                                 ),
-                              ],
-                            ),
-                          if (widget.gameData['time'] != null) ...[
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.withOpacity(0.1),
-                                    shape: BoxShape.circle,
+                              ),
+                              const SizedBox(width: 16),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${_formatDateTime(widget.gameData['start_datetime'])} - ${_formatDateTime(widget.gameData['end_datetime'])}',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
                                   ),
-                                  child: Icon(
-                                    Icons.access_time_rounded,
-                                    color: Colors.orange.shade700,
-                                    size: 20,
+                                  Text(
+                                    'Scheduled',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      widget.gameData['time'],
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Time',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                           if (widget.gameData['total_price'] != null) ...[
                             const SizedBox(height: 16),
                             Divider(color: Colors.grey.shade100),
@@ -817,6 +875,13 @@ class _ManageGameScreenState extends State<ManageGameScreen> {
                                   ),
                                 );
                               },
+                            ),
+                            _buildModernActionButton(
+                              icon: Icons.cancel,
+                              label: 'Cancel Booking',
+                              color: Colors.grey,
+                              // isActive: widget.gameData['payment_status'] != 'paid',
+                              onTap: _cancelBooking,
                             ),
                           ],
                         ),

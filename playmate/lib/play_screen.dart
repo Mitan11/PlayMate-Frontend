@@ -16,6 +16,19 @@ class PlayScreen extends StatefulWidget {
 }
 
 class _PlayScreenState extends State<PlayScreen> {
+    String _formatDateTime(String? dateTimeStr) {
+      if (dateTimeStr == null) return '';
+      final dt = DateTime.tryParse(dateTimeStr);
+      if (dt == null) return '';
+      final months = [
+        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      final hour = dt.hour > 12 ? dt.hour - 12 : dt.hour == 0 ? 12 : dt.hour;
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '${months[dt.month]} ${dt.day}, $hour:$min $ampm';
+    }
   final Color themeColor = const Color(0xFF2E7D32);
   late String _selectedFilter; // Options: All Games, Joined, Created
   List<Map<String, dynamic>>? _sportsFilters;
@@ -114,6 +127,8 @@ class _PlayScreenState extends State<PlayScreen> {
                 'created_at': item['created_at']?.toString(),
                 'game_id': item['game_id'],
                 'status': item['status'],
+                'start_datetime': item['start_datetime'],
+                'end_datetime': item['end_datetime'],
               };
             }).toList();
           });
@@ -171,6 +186,8 @@ class _PlayScreenState extends State<PlayScreen> {
                 'user_image': profileImage,
                 'created_at': item['created_at']?.toString(),
                 'game_id': item['game_id'] ?? item['booking_id'],
+                'start_datetime': item['start_datetime'],
+                'end_datetime': item['end_datetime'],
               };
             }).toList();
           });
@@ -241,6 +258,8 @@ class _PlayScreenState extends State<PlayScreen> {
                 'payment_status': item['payment_status'],
                 'total_price': item['total_price'],
                 'status': item['game_status'],
+                'start_datetime': item['start_datetime'],
+                'end_datetime': item['end_datetime'],
               };
             }).toList();
 
@@ -817,7 +836,24 @@ class _PlayScreenState extends State<PlayScreen> {
                                         color: Colors.black87,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    // Scheduled Date/Time Row (always show if present)
+                                    if (item['start_datetime'] != null && item['end_datetime'] != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4, bottom: 4),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.schedule, size: 14, color: Colors.grey.shade500),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${_formatDateTime(item['start_datetime'])} - ${_formatDateTime(item['end_datetime'])}',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 13,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     Row(
                                       children: [
                                         Icon(
