@@ -10,6 +10,8 @@ import 'package:playmate/privacy_policy_screen.dart';
 // ... existing imports
 
 class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }

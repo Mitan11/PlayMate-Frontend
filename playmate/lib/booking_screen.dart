@@ -61,7 +61,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   // Price Data
   double _courtPrice = 0.0;
-  final double _convenienceFee = 50.0;
+  // final double _convenienceFee = 50.0; // Removed convenience fee
 
   double _totalAmount = 0.0;
   bool _isLoadingPrice = false;
@@ -675,16 +675,15 @@ class _BookingScreenState extends State<BookingScreen> {
         }
       }
 
-      // Calculate total
-      double totalAmount = courtPrice + _convenienceFee;
+      // Calculate total (no convenience fee)
+      double totalAmount = courtPrice;
 
       debugPrint(
-        'Selected Slot: $_selectedSlot, Court Price: $courtPrice, Fee: $_convenienceFee, Total: $totalAmount',
+        'Selected Slot: $_selectedSlot, Court Price: $courtPrice, Total: $totalAmount',
       );
 
       setState(() {
         _courtPrice = courtPrice;
-
         _totalAmount = totalAmount;
       });
     } catch (e) {
@@ -1123,11 +1122,6 @@ class _BookingScreenState extends State<BookingScreen> {
                                 _buildPriceRow(
                                   'Court Price',
                                   'INR ${_courtPrice.toStringAsFixed(0)}',
-                                ),
-                                const SizedBox(height: 8),
-                                _buildPriceRow(
-                                  'Convenience Fee',
-                                  'INR ${_convenienceFee.toStringAsFixed(0)}',
                                 ),
                               ],
                             ),

@@ -33,8 +33,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   List<Map<String, dynamic>> _availableSports = [];
   bool _isLoadingProfile = true;
   List<String> _userPosts = [];
-  Map<int, bool> _likedPosts = {};
-  Map<int, int> _postLikes = {};
+  final Map<int, bool> _likedPosts = {};
+  final Map<int, int> _postLikes = {};
 
   StreamSubscription? _postUpdateSubscription;
 

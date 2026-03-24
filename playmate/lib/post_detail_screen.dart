@@ -511,7 +511,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   // Post stats
                   if (_likeCount > 0)
                     Text(
-                      '${_likeCount} likes',
+                      '$_likeCount likes',
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         color: Colors.grey.shade600,

@@ -538,9 +538,9 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final date = DateTime.parse(activity['created_at']);
         final diff = DateTime.now().difference(date);
-        if (diff.inDays > 0)
+        if (diff.inDays > 0) {
           timeAgo = '${diff.inDays}d ago';
-        else if (diff.inHours > 0)
+        } else if (diff.inHours > 0)
           timeAgo = '${diff.inHours}h ago';
         else if (diff.inMinutes > 0)
           timeAgo = '${diff.inMinutes}m ago';
