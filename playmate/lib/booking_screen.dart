@@ -58,6 +58,8 @@ class _BookingScreenState extends State<BookingScreen> {
 
   // Map to store slot_id for each slot
   Map<String, int> _slotIds = {};
+  Map<String, String> _slotStartTimes = {};
+  Map<String, String> _slotEndTimes = {};
 
   // Recommendation metadata per slot
   Map<String, bool> _slotRecommended = {};
@@ -276,15 +278,81 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
-    final options = {
+    final prefs = await SharedPreferences.getInstance();
+    final firstName = (prefs.getString('first_name') ?? '').trim();
+    final lastName = (prefs.getString('last_name') ?? '').trim();
+    final userEmail = (prefs.getString('user_email') ?? '').trim();
+    final userPhone = (prefs.getString('phone_number') ?? '').trim();
+    final userId = (prefs.getString('user_id') ?? '').trim();
+    final fullName = [firstName, lastName]
+        .where((part) => part.isNotEmpty)
+        .join(' ')
+        .trim();
+
+    final selectedSport = _sportsList.firstWhere(
+      (sport) => sport['sport_id'].toString() == _selectedSportId,
+      orElse: () => {'sport_name': 'Game'},
+    );
+    final sportName = selectedSport['sport_name']?.toString() ?? 'Game';
+    final bookingDate =
+        '${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}';
+    final venueName = _currentVenueName ?? 'PlayMate';
+    final slotText = _selectedSlot ?? 'N/A';
+    final userNameForDisplay = fullName.isEmpty ? 'PlayMate User' : fullName;
+    final compactSlot = slotText.replaceAll(' to ', '-');
+    final bookingDescription =
+      '$userNameForDisplay | $sportName | $bookingDate | $compactSlot' ;
+
+    final shouldContinue = await _showPaymentDetailsSheet(
+      userName: userNameForDisplay,
+      userEmail: userEmail,
+      userPhone: userPhone,
+      venueName: venueName,
+      sportName: sportName,
+      bookingDate: bookingDate,
+      slotText: slotText,
+      amountText: 'INR ${_totalAmount.toStringAsFixed(0)}',
+      area: _areaController.text.trim(),
+    );
+
+    if (!shouldContinue) {
+      if (!mounted) return;
+      setState(() => _isProcessingPayment = false);
+      return;
+    }
+
+    final Map<String, dynamic> options = {
       'key': keyId,
       'order_id': orderData['order_id'],
       'amount': orderData['amount'],
       'currency': orderData['currency'],
-      'name': _currentVenueName ?? 'PlayMate',
-      'description': 'Venue booking',
+      'name': venueName,
+      'description': bookingDescription,
       'theme': {'color': '#2E7D32'},
+      'retry': {'enabled': true, 'max_count': 1},
+      'notes': {
+        'user_name': fullName.isEmpty ? 'PlayMate User' : fullName,
+        'user_id': userId,
+        'venue': venueName,
+        'sport': sportName,
+        'date': bookingDate,
+        'slot': _selectedSlot ?? '',
+        'area': _areaController.text.trim(),
+        'court_price': _courtPrice.toStringAsFixed(0),
+        'total_amount': _totalAmount.toStringAsFixed(0),
+      },
     };
+
+    final Map<String, dynamic> prefill = {
+      'name': fullName.isEmpty ? 'PlayMate User' : fullName,
+    };
+    if (userEmail.isNotEmpty) {
+      prefill['email'] = userEmail;
+    }
+    if (userPhone.isNotEmpty) {
+      prefill['contact'] = userPhone;
+    }
+    options['prefill'] = prefill;
 
     if (upiOnly) {
       options['method'] = {'upi': true};
@@ -313,6 +381,121 @@ class _BookingScreenState extends State<BookingScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Payment error: $e')));
     }
+  }
+
+  Future<bool> _showPaymentDetailsSheet({
+    required String userName,
+    required String userEmail,
+    required String userPhone,
+    required String venueName,
+    required String sportName,
+    required String bookingDate,
+    required String slotText,
+    required String amountText,
+    required String area,
+  }) async {
+    if (!mounted) return false;
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Confirm Payment Details',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _buildPriceRow('User', userName),
+                  if (userEmail.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _buildPriceRow('Email', userEmail),
+                  ],
+                  if (userPhone.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _buildPriceRow('Phone', userPhone),
+                  ],
+                  const SizedBox(height: 8),
+                  _buildPriceRow('Venue', venueName),
+                  const SizedBox(height: 8),
+                  _buildPriceRow('Sport', sportName),
+                  const SizedBox(height: 8),
+                  _buildPriceRow('Date', bookingDate),
+                  const SizedBox(height: 8),
+                  _buildPriceRow('Slot', slotText),
+                  if (area.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _buildPriceRow('Area', area),
+                  ],
+                  const SizedBox(height: 8),
+                  _buildPriceRow('Amount', amountText),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: Text(
+                            'Back',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: themeColor,
+                          ),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: Text(
+                            'Continue',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return result ?? false;
   }
 
   Future<void> _createBooking({required dynamic payment}) async {
@@ -357,10 +540,9 @@ class _BookingScreenState extends State<BookingScreen> {
       final dateStr =
           "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
 
-      // Extract start and end time from selected slot (e.g., "07:00 to 08:00")
-      final slotParts = _selectedSlot!.split(' to ');
-      final startTime = slotParts.isNotEmpty ? slotParts[0] : '00:00';
-      final endTime = slotParts.length > 1 ? slotParts[1] : '00:00';
+      // Always send API datetimes in 24h format, even when UI displays 12h.
+      final startTime = _slotStartTimes[_selectedSlot!] ?? '00:00';
+      final endTime = _slotEndTimes[_selectedSlot!] ?? '00:00';
 
       final startDatetime = '$dateStr $startTime:00';
       final endDatetime = '$dateStr $endTime:00';
@@ -606,69 +788,119 @@ class _BookingScreenState extends State<BookingScreen> {
         }
 
         if (slotsData.isNotEmpty) {
-          setState(() {
-            _slots = [];
-            _slotPrices = {}; // Clear previous prices
-            _slotIds = {}; // Clear previous slot IDs
-            _slotRecommended = {}; // Clear previous recommendation flags
-            _slotRecommendationReason = {}; // Clear previous recommendation reasons
+          // Prepare a list of slot info objects for sorting
+          final List<Map<String, dynamic>> slotInfoList = [];
+          // Clear previous data
+          _slotPrices = {};
+          _slotIds = {};
+          _slotStartTimes = {};
+          _slotEndTimes = {};
+          _slotRecommended = {};
+          _slotRecommendationReason = {};
 
-            for (var e in slotsData) {
-              if (e is Map) {
-                final start = e['start_time']?.toString();
-                final end = e['end_time']?.toString();
-                final priceData = e['price_per_slot'];
-                final slotId = e['slot_id'];
-                final isRecommended = e['is_recommended'] == true;
-                String recommendationReason = '';
-                if (e['recommendation'] is Map) {
-                  final recommendation = e['recommendation'] as Map;
-                  recommendationReason =
-                      recommendation['reason']?.toString() ?? '';
-                }
+          for (var e in slotsData) {
+            if (e is Map) {
+              final start = e['start_time']?.toString();
+              final end = e['end_time']?.toString();
+              final priceData = e['price_per_slot'];
+              final slotId = e['slot_id'];
+              final isRecommended = e['is_recommended'] == true;
+              String recommendationReason = '';
+              if (e['recommendation'] is Map) {
+                final recommendation = e['recommendation'] as Map;
+                recommendationReason = recommendation['reason']?.toString() ?? '';
+              }
 
-                if (start != null && end != null) {
-                  // Format "09:00:00" -> "09:00"
-                  final s = start.length >= 5 ? start.substring(0, 5) : start;
-                  final endTime = end.length >= 5 ? end.substring(0, 5) : end;
-                  final slotTime = '$s to $endTime';
+              if (start != null && end != null) {
+                final s = start.length >= 5 ? start.substring(0, 5) : start;
+                final endTime = end.length >= 5 ? end.substring(0, 5) : end;
+                final slotTime = '${_to12Hour(s)} to ${_to12Hour(endTime)}';
 
-                  _slots.add(slotTime);
+                slotInfoList.add({
+                  'slotTime': slotTime,
+                  'start': s,
+                  'end': endTime,
+                  'priceData': priceData,
+                  'slotId': slotId,
+                  'isRecommended': isRecommended,
+                  'recommendationReason': recommendationReason,
+                });
+              }
+            } else if (e is String) {
+              final raw = e.trim();
+              if (raw.isEmpty) continue;
 
-                  // Store price for this slot
-                  if (priceData != null) {
-                    final price = (priceData is int)
-                        ? priceData.toDouble()
-                        : (priceData is double)
-                        ? priceData
-                        : double.tryParse(priceData.toString()) ?? 0.0;
-                    _slotPrices[slotTime] = price;
-                    debugPrint(
-                      'Slot: $slotTime -> Price: $price (from API: $priceData)',
-                    );
-                  }
-
-                  // Store slot_id for this slot
-                  if (slotId != null) {
-                    final id = (slotId is int)
-                        ? slotId
-                        : int.tryParse(slotId.toString()) ?? 0;
-                    _slotIds[slotTime] = id;
-                  }
-
-                  _slotRecommended[slotTime] = isRecommended;
-                  if (recommendationReason.isNotEmpty) {
-                    _slotRecommendationReason[slotTime] = recommendationReason;
-                  }
-                }
-              } else if (e is String) {
-                _slots.add(e);
+              final parts = raw.split(' to ');
+              if (parts.length == 2) {
+                final rawStart = parts[0].trim();
+                final rawEnd = parts[1].trim();
+                final start24 = _to24Hour(rawStart);
+                final end24 = _to24Hour(rawEnd);
+                final slotDisplay = '${_to12Hour(start24)} to ${_to12Hour(end24)}';
+                slotInfoList.add({
+                  'slotTime': slotDisplay,
+                  'start': start24,
+                  'end': end24,
+                  'priceData': null,
+                  'slotId': null,
+                  'isRecommended': false,
+                  'recommendationReason': '',
+                });
+              } else {
+                slotInfoList.add({
+                  'slotTime': raw,
+                  'start': null,
+                  'end': null,
+                  'priceData': null,
+                  'slotId': null,
+                  'isRecommended': false,
+                  'recommendationReason': '',
+                });
               }
             }
+          }
 
-            debugPrint(
-              'Loaded ${_slots.length} slots with prices: $_slotPrices',
-            );
+          // Sort: recommended slots first, then by start time if available
+          slotInfoList.sort((a, b) {
+            if (a['isRecommended'] == b['isRecommended']) {
+              // If both have start, sort by start time
+              if (a['start'] != null && b['start'] != null) {
+                return a['start'].compareTo(b['start']);
+              }
+              return 0;
+            }
+            return b['isRecommended'] ? 1 : -1;
+          });
+
+          setState(() {
+            _slots = [];
+            for (final slot in slotInfoList) {
+              final slotTime = slot['slotTime'];
+              _slots.add(slotTime);
+              if (slot['start'] != null) _slotStartTimes[slotTime] = slot['start'];
+              if (slot['end'] != null) _slotEndTimes[slotTime] = slot['end'];
+              if (slot['priceData'] != null) {
+                final priceData = slot['priceData'];
+                final price = (priceData is int)
+                    ? priceData.toDouble()
+                    : (priceData is double)
+                        ? priceData
+                        : double.tryParse(priceData.toString()) ?? 0.0;
+                _slotPrices[slotTime] = price;
+              }
+              if (slot['slotId'] != null) {
+                final slotId = slot['slotId'];
+                final id = (slotId is int)
+                    ? slotId
+                    : int.tryParse(slotId.toString()) ?? 0;
+                _slotIds[slotTime] = id;
+              }
+              _slotRecommended[slotTime] = slot['isRecommended'] ?? false;
+              if ((slot['recommendationReason'] ?? '').isNotEmpty) {
+                _slotRecommendationReason[slotTime] = slot['recommendationReason'];
+              }
+            }
+            debugPrint('Loaded ${_slots.length} slots with prices: $_slotPrices');
           });
         } else {
           debugPrint('No slots found in response structure.');
@@ -1360,43 +1592,6 @@ class _BookingScreenState extends State<BookingScreen> {
                                           ),
                                         ),
                                       ),
-                                      if (_paymentMethod ==
-                                          PaymentMethod.online)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 8,
-                                          ),
-                                          child: SizedBox(
-                                            width: double.infinity,
-                                            child: OutlinedButton(
-                                              onPressed:
-                                                  !_isRazorpayAvailable ||
-                                                      _isProcessingPayment
-                                                  ? null
-                                                  : () async {
-                                                      await _startOnlinePayment(
-                                                        upiOnly: true,
-                                                      );
-                                                    },
-                                              style: OutlinedButton.styleFrom(
-                                                side: BorderSide(
-                                                  color: themeColor,
-                                                ),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                ),
-                                              ),
-                                              child: Text(
-                                                'PAY VIA UPI',
-                                                style: GoogleFonts.poppins(
-                                                  fontWeight: FontWeight.w600,
-                                                  color: themeColor,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
                                     ],
                                   ),
                                 ),
@@ -1541,24 +1736,81 @@ class _BookingScreenState extends State<BookingScreen> {
     return days[weekday - 1];
   }
 
+  String _to12Hour(String input) {
+    final raw = input.trim();
+    if (raw.isEmpty) return raw;
+    if (raw.toUpperCase().contains('AM') || raw.toUpperCase().contains('PM')) {
+      return raw;
+    }
+
+    final parts = raw.split(':');
+    if (parts.length < 2) return raw;
+
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return raw;
+
+    final suffix = hour >= 12 ? 'PM' : 'AM';
+    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+    return '$hour12:${minute.toString().padLeft(2, '0')} $suffix';
+  }
+
+  String _to24Hour(String input) {
+    final raw = input.trim();
+    if (raw.isEmpty) return raw;
+
+    final upper = raw.toUpperCase();
+    if (!upper.contains('AM') && !upper.contains('PM')) {
+      final parts = raw.split(':');
+      if (parts.length >= 2) {
+        final hh = int.tryParse(parts[0]);
+        final mm = int.tryParse(parts[1]);
+        if (hh != null && mm != null) {
+          return '${hh.toString().padLeft(2, '0')}:${mm.toString().padLeft(2, '0')}';
+        }
+      }
+      return raw;
+    }
+
+    final cleaned = upper.replaceAll('AM', '').replaceAll('PM', '').trim();
+    final parts = cleaned.split(':');
+    if (parts.length < 2) return raw;
+    final hour12 = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour12 == null || minute == null) return raw;
+
+    final isPm = upper.contains('PM');
+    int hour24 = hour12 % 12;
+    if (isPm) hour24 += 12;
+
+    return '${hour24.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+  }
+
   Widget _buildPriceRow(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
           ),
         ),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            softWrap: true,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
           ),
         ),
       ],
