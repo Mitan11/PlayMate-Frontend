@@ -59,6 +59,10 @@ class _BookingScreenState extends State<BookingScreen> {
   // Map to store slot_id for each slot
   Map<String, int> _slotIds = {};
 
+  // Recommendation metadata per slot
+  Map<String, bool> _slotRecommended = {};
+  Map<String, String> _slotRecommendationReason = {};
+
   // Price Data
   double _courtPrice = 0.0;
   // final double _convenienceFee = 50.0; // Removed convenience fee
@@ -484,6 +488,7 @@ class _BookingScreenState extends State<BookingScreen> {
       final base = dotenv.env['BASE_URL'] ?? '';
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
       final uri = Uri.parse('$base/venue/allVenues');
 
       final resp = await http.get(
@@ -551,6 +556,7 @@ class _BookingScreenState extends State<BookingScreen> {
       final base = dotenv.env['BASE_URL'] ?? '';
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
+      final userId = prefs.getString('user_id');
 
       final dateStr =
           "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
@@ -561,23 +567,51 @@ class _BookingScreenState extends State<BookingScreen> {
 
       debugPrint('Fetching Slots URL: $uri');
 
-      final resp = await http.get(
-        uri,
-        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
-      );
+      final request = http.Request('GET', uri);
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['Content-Type'] = 'application/json';
+      if (userId != null && userId.isNotEmpty) {
+        request.body = jsonEncode({'userId': userId});
+      }
+
+      final streamedResp = await request.send();
+      final resp = await http.Response.fromStream(streamedResp);
 
       debugPrint('Slots Response Code: ${resp.statusCode}');
       debugPrint('Slots Response Body: ${resp.body}');
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        if (data['status'] == true && data['data'] != null) {
-          final slotsData = List<dynamic>.from(data['data']);
+        List<dynamic> slotsData = [];
 
+        // Supports new structure (merged_slots/available_slots), while
+        // keeping backward compatibility with the old data array response.
+        if (data is Map<String, dynamic>) {
+          if (data['merged_slots'] is List) {
+            slotsData = List<dynamic>.from(data['merged_slots']);
+          } else if (data['available_slots'] is List) {
+            slotsData = List<dynamic>.from(data['available_slots']);
+          } else if (data['data'] is List) {
+            slotsData = List<dynamic>.from(data['data']);
+          } else if (data['data'] is Map<String, dynamic>) {
+            final nested = data['data'] as Map<String, dynamic>;
+            if (nested['merged_slots'] is List) {
+              slotsData = List<dynamic>.from(nested['merged_slots']);
+            } else if (nested['available_slots'] is List) {
+              slotsData = List<dynamic>.from(nested['available_slots']);
+            }
+          }
+        }
+
+        if (slotsData.isNotEmpty) {
           setState(() {
             _slots = [];
             _slotPrices = {}; // Clear previous prices
             _slotIds = {}; // Clear previous slot IDs
+            _slotRecommended = {}; // Clear previous recommendation flags
+            _slotRecommendationReason = {}; // Clear previous recommendation reasons
 
             for (var e in slotsData) {
               if (e is Map) {
@@ -585,6 +619,13 @@ class _BookingScreenState extends State<BookingScreen> {
                 final end = e['end_time']?.toString();
                 final priceData = e['price_per_slot'];
                 final slotId = e['slot_id'];
+                final isRecommended = e['is_recommended'] == true;
+                String recommendationReason = '';
+                if (e['recommendation'] is Map) {
+                  final recommendation = e['recommendation'] as Map;
+                  recommendationReason =
+                      recommendation['reason']?.toString() ?? '';
+                }
 
                 if (start != null && end != null) {
                   // Format "09:00:00" -> "09:00"
@@ -614,6 +655,11 @@ class _BookingScreenState extends State<BookingScreen> {
                         : int.tryParse(slotId.toString()) ?? 0;
                     _slotIds[slotTime] = id;
                   }
+
+                  _slotRecommended[slotTime] = isRecommended;
+                  if (recommendationReason.isNotEmpty) {
+                    _slotRecommendationReason[slotTime] = recommendationReason;
+                  }
                 }
               } else if (e is String) {
                 _slots.add(e);
@@ -625,7 +671,7 @@ class _BookingScreenState extends State<BookingScreen> {
             );
           });
         } else {
-          debugPrint('API status false or data null: ${data['message']}');
+          debugPrint('No slots found in response structure.');
         }
       } else {
         debugPrint('Failed to load slots: ${resp.body}');
@@ -1043,6 +1089,10 @@ class _BookingScreenState extends State<BookingScreen> {
                               : _slots.map((slot) {
                                   final isSelected = _selectedSlot == slot;
                                   final slotPrice = _slotPrices[slot] ?? 0.0;
+                                  final isRecommended =
+                                      _slotRecommended[slot] == true;
+                                  final recommendationReason =
+                                      _slotRecommendationReason[slot] ?? '';
 
                                   return GestureDetector(
                                     onTap: () {
@@ -1081,6 +1131,35 @@ class _BookingScreenState extends State<BookingScreen> {
                                                   : Colors.black87,
                                             ),
                                           ),
+                                          if (isRecommended) ...[
+                                            const SizedBox(height: 4),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: isSelected
+                                                    ? Colors.white.withOpacity(
+                                                        0.22,
+                                                      )
+                                                    : const Color(0xFFE8F5E9),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                'Recommended',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isSelected
+                                                      ? Colors.white
+                                                      : themeColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                           if (slotPrice > 0) ...[
                                             const SizedBox(height: 4),
                                             Text(
