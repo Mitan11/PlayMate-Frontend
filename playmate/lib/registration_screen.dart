@@ -53,6 +53,103 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String? _passwordError;
   String? _confirmPasswordError;
 
+  // Password requirement tracking
+  bool _hasMinLength = false;
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasNumber = false;
+  bool _hasSpecialChar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to password changes to update requirements
+    passwordController.addListener(_updatePasswordRequirements);
+  }
+
+  @override
+  void dispose() {
+    firstNameController.dispose();
+    lastNameController.dispose();
+    emailController.dispose();
+    phoneNumberController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _updatePasswordRequirements() {
+    final password = passwordController.text;
+    setState(() {
+      _hasMinLength = password.length >= 8;
+      _hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      _hasLowercase = password.contains(RegExp(r'[a-z]'));
+      _hasNumber = password.contains(RegExp(r'[0-9]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+    });
+  }
+
+  Widget _buildPasswordRequirements() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Password Requirements:',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        _requirementItem('At least 8 characters', _hasMinLength),
+        _requirementItem('One uppercase letter (A-Z)', _hasUppercase),
+        _requirementItem('One lowercase letter (a-z)', _hasLowercase),
+        _requirementItem('One number (0-9)', _hasNumber),
+        _requirementItem('One special character (!@#\$%^&*)', _hasSpecialChar),
+      ],
+    );
+  }
+
+  Widget _requirementItem(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isMet ? themeColor : Colors.grey.shade300,
+              border: Border.all(
+                color: isMet ? themeColor : Colors.grey.shade400,
+              ),
+            ),
+            child: isMet
+                ? const Icon(
+                    Icons.check,
+                    size: 12,
+                    color: Colors.white,
+                  )
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: isMet ? themeColor : Colors.grey[600],
+                fontWeight: isMet ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // PICK IMAGE AND OPEN CROP UI
   Future<void> pickImage() async {
     // Show dialog to choose between camera and gallery
@@ -175,6 +272,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       hasError = true;
     } else if (pass.length < 8) {
       setState(() => _passwordError = 'Password must be at least 8 characters');
+      hasError = true;
+    } else if (!pass.contains(RegExp(r'[A-Z]'))) {
+      setState(() => _passwordError = 'Password must contain an uppercase letter');
+      hasError = true;
+    } else if (!pass.contains(RegExp(r'[a-z]'))) {
+      setState(() => _passwordError = 'Password must contain a lowercase letter');
+      hasError = true;
+    } else if (!pass.contains(RegExp(r'[0-9]'))) {
+      setState(() => _passwordError = 'Password must contain a number');
+      hasError = true;
+    } else if (!pass.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
+      setState(() => _passwordError = 'Password must contain a special character (!@#\$%^&*)');
       hasError = true;
     }
     if (cpass.isEmpty) {
@@ -588,6 +697,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 },
                               ),
                       ),
+                      const SizedBox(height: 12),
+                      _buildPasswordRequirements(),
                       const SizedBox(height: 20),
 
                       _label("Confirm Password"),
