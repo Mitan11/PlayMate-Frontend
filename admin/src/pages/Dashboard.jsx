@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import Box from "@mui/joy/Box";
 import Card from "@mui/joy/Card";
@@ -6,54 +6,39 @@ import Typography from "@mui/joy/Typography";
 import Button from "@mui/joy/Button";
 import LinearProgress from "@mui/joy/LinearProgress";
 import { useNavigate } from "react-router";
-import axios from "axios";
-import { AppContext } from "../context/AppContextProvider";
 import { toast } from "react-hot-toast";
 import Preloader from "../components/Preloader";
+import { useDispatch, useSelector } from "react-redux";
+import {
+    selectDashboardError,
+    selectDashboardRecentActivities,
+    selectDashboardSportMetrics,
+    selectDashboardStats,
+    selectDashboardStatus,
+} from "../redux/dashboard/dashboardSelectors";
+import { clearDashboardError as clearDashboardErrorAction } from "../redux/dashboard/dashboardSlice";
+import { fetchDashboardData } from "../redux/dashboard/dashboardThunks";
 
 function Dashboard() {
     const navigate = useNavigate();
-    const { backendUrl, aToken } = useContext(AppContext);
+    const dispatch = useDispatch();
+    const stats = useSelector(selectDashboardStats);
+    const sportMetrics = useSelector(selectDashboardSportMetrics);
+    const recentActivities = useSelector(selectDashboardRecentActivities);
+    const status = useSelector(selectDashboardStatus);
+    const error = useSelector(selectDashboardError);
+    const loading = status === "loading" || status === "idle";
 
-    const [stats, setStats] = useState(null);
-    const [sportMetrics, setSportMetrics] = useState([]);
-    const [recentActivities, setRecentActivities] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    // Fetch all dashboard data
     useEffect(() => {
-        fetchDashboardData();
-    }, []);
+        dispatch(fetchDashboardData());
+    }, [dispatch]);
 
-    const fetchDashboardData = async () => {
-        try {
-            setLoading(true);
-
-            const headers = {
-                Authorization: `Bearer ${aToken}`,
-            };
-
-            const [
-                statsRes,
-                metricsRes,
-                activitiesRes,
-            ] = await Promise.all([
-                axios.get(`${backendUrl}/admin/dashboard/stats`, { headers }),
-                axios.get(`${backendUrl}/admin/dashboard/sport/metrics`, { headers }),
-                axios.get(`${backendUrl}/admin/dashboard/recent/activities`, { headers }),
-            ]);
-
-            setStats(statsRes.data.data);
-            setSportMetrics(metricsRes.data.data || []);
-            setRecentActivities(activitiesRes.data.data || []);
-
-        } catch (error) {
-            console.log("Error fetching dashboard data:", error);
-            // toast.error("Failed to load dashboard data");
-        } finally {
-            setLoading(false);
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            dispatch(clearDashboardErrorAction());
         }
-    };
+    }, [error, dispatch]);
 
     const containerVariants = {
         hidden: { opacity: 0, y: 10 },
@@ -102,7 +87,7 @@ function Dashboard() {
                             variant="outlined"
                             color="neutral"
                             loading={loading}
-                            onClick={fetchDashboardData}
+                            onClick={() => dispatch(fetchDashboardData())}
                         >
                             Refresh
                         </Button>

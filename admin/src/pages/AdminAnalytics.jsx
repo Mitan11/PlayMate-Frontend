@@ -1,6 +1,4 @@
-import React, { useEffect, useState, useContext, useMemo } from "react";
-import axios from "axios";
-import { AppContext } from "../context/AppContextProvider";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 
 import {
@@ -20,170 +18,68 @@ import Divider from "@mui/joy/Divider";
 import Modal from "@mui/joy/Modal";
 import ModalDialog from "@mui/joy/ModalDialog";
 import Button from "@mui/joy/Button";
+import { useDispatch, useSelector } from "react-redux";
+import {
+    selectAnalyticsBookingData,
+    selectAnalyticsError,
+    selectAnalyticsRevenueData,
+    selectAnalyticsStatus,
+    selectAnalyticsUserData,
+    selectBookingTrendData,
+    selectMostBookedVenuesData,
+    selectMostLikedPostsData,
+    selectMostPlayedSportsData,
+    selectMonthlyRevenueData,
+    selectPeakBookingHoursData,
+    selectRevenueBySportData,
+    selectRevenueByVenueData,
+    selectTopContentCreatorsData,
+    selectTopUsersByBookingsData,
+    selectUserGrowthData,
+    selectVenueGrowthData,
+} from "../redux/analytics/analyticsSelectors";
+import { fetchAnalytics } from "../redux/analytics/analyticsThunks";
+import { clearAnalyticsError as clearAnalyticsErrorAction } from "../redux/analytics/analyticsSlice";
 
 function AdminAnalytics() {
-    const { backendUrl, aToken } = useContext(AppContext);
+    const dispatch = useDispatch();
 
-    // Existing state
-    const [bookingData, setBookingData] = useState([]);
-    const [revenueData, setRevenueData] = useState([]);
-    const [userData, setUserData] = useState([]);
-
-    // New analytics state
-    const [userGrowthData, setUserGrowthData] = useState([]);
-    const [venueGrowthData, setVenueGrowthData] = useState([]);
-    const [bookingTrendData, setBookingTrendData] = useState([]);
-    const [monthlyRevenueData, setMonthlyRevenueData] = useState([]);
-    const [revenueByVenueData, setRevenueByVenueData] = useState([]);
-    const [revenueBySportData, setRevenueBySportData] = useState([]);
-    const [mostPlayedSportsData, setMostPlayedSportsData] = useState([]);
-    const [mostBookedVenuesData, setMostBookedVenuesData] = useState([]);
-    const [peakBookingHoursData, setPeakBookingHoursData] = useState([]);
-    const [topUsersByBookingsData, setTopUsersByBookingsData] = useState([]);
-    const [mostLikedPostsData, setMostLikedPostsData] = useState([]);
-    const [topContentCreatorsData, setTopContentCreatorsData] = useState([]);
+    const bookingData = useSelector(selectAnalyticsBookingData);
+    const revenueData = useSelector(selectAnalyticsRevenueData);
+    const userData = useSelector(selectAnalyticsUserData);
+    const userGrowthData = useSelector(selectUserGrowthData);
+    const venueGrowthData = useSelector(selectVenueGrowthData);
+    const bookingTrendData = useSelector(selectBookingTrendData);
+    const monthlyRevenueData = useSelector(selectMonthlyRevenueData);
+    const revenueByVenueData = useSelector(selectRevenueByVenueData);
+    const revenueBySportData = useSelector(selectRevenueBySportData);
+    const mostPlayedSportsData = useSelector(selectMostPlayedSportsData);
+    const mostBookedVenuesData = useSelector(selectMostBookedVenuesData);
+    const peakBookingHoursData = useSelector(selectPeakBookingHoursData);
+    const topUsersByBookingsData = useSelector(selectTopUsersByBookingsData);
+    const mostLikedPostsData = useSelector(selectMostLikedPostsData);
+    const topContentCreatorsData = useSelector(selectTopContentCreatorsData);
+    const status = useSelector(selectAnalyticsStatus);
+    const error = useSelector(selectAnalyticsError);
+    const loading = status === "loading" || status === "idle";
     
     // Modal state for post details
     const [selectedPost, setSelectedPost] = useState(null);
     const [modalOpen, setModalOpen] = useState(false);
 
-    const [loading, setLoading] = useState(true);
+    useEffect(() => {
+        dispatch(fetchAnalytics());
+    }, [dispatch]);
 
     useEffect(() => {
-        fetchAllAnalytics();
-    }, []);
-
-    const fetchAllAnalytics = async () => {
-        try {
-            setLoading(true);
-            const headers = { Authorization: `Bearer ${aToken}` };
-
-            // Fetch all analytics data in parallel
-            const [
-                userGrowthRes,
-                venueGrowthRes,
-                bookingTrendRes,
-                monthlyRevenueRes,
-                revenueByVenueRes,
-                revenueBySportRes,
-                mostPlayedSportsRes,
-                mostBookedVenuesRes,
-                peakBookingHoursRes,
-                topUsersByBookingsRes,
-                mostLikedPostsRes,
-                topContentCreatorsRes,
-                // Legacy endpoints for backward compatibility
-                bookingRes,
-                revenueRes,
-                userRes,
-            ] = await Promise.all([
-                axios.get(`${backendUrl}/admin/analytics/user-growth`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/venue-growth`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/booking-trend`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/monthly-revenue`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/revenue-by-venue`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/revenue-by-sport`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/most-played-sports`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/most-booked-venues`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/peak-booking-hours`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/top-users-by-bookings`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/most-liked-posts`, { headers }),
-                axios.get(`${backendUrl}/admin/analytics/top-content-creators`, { headers }),
-                // Legacy endpoints
-                axios.get(`${backendUrl}/admin/dashboard/booking/report`, { headers }).catch(() => ({ data: { data: [] } })),
-                axios.get(`${backendUrl}/admin/dashboard/revenue/report`, { headers }).catch(() => ({ data: { data: [] } })),
-                axios.get(`${backendUrl}/admin/dashboard/user/report`, { headers }).catch(() => ({ data: { data: [] } })),
-            ]);
-
-            // Set new analytics data
-            const formattedUserGrowth = formatMonthlyData(userGrowthRes.data.data || [], "users_registered");
-            const formattedVenueGrowth = formatMonthlyData(venueGrowthRes.data.data || [], "venues_added");
-            const formattedBookingTrend = formatDailyData(bookingTrendRes.data.data || [], "total_bookings");
-            const formattedMonthlyRevenue = formatMonthlyData(monthlyRevenueRes.data.data || [], "revenue");
-
-            setUserGrowthData(formattedUserGrowth);
-            setVenueGrowthData(formattedVenueGrowth);
-            setBookingTrendData(formattedBookingTrend);
-            setMonthlyRevenueData(formattedMonthlyRevenue);
-
-            // Process revenue data (convert string values to numbers)
-            const processRevenueData = (data) => data.map(item => ({
-                ...item,
-                revenue: parseFloat(item.revenue) || 0
-            }));
-
-            const processedRevenueBySport = processRevenueData(revenueBySportRes.data.data || []);
-            
-            setRevenueByVenueData(processRevenueData(revenueByVenueRes.data.data || []));
-            setRevenueBySportData(processedRevenueBySport);
-            setMostPlayedSportsData(mostPlayedSportsRes.data.data || []);
-            setMostBookedVenuesData(mostBookedVenuesRes.data.data || []);
-            setPeakBookingHoursData(formatHourlyData(peakBookingHoursRes.data.data || []));
-            setTopUsersByBookingsData(topUsersByBookingsRes.data.data || []);
-            setMostLikedPostsData(mostLikedPostsRes.data.data || []);
-            setTopContentCreatorsData(topContentCreatorsRes.data.data || []);
-
-            // Legacy data for backward compatibility
-            setBookingData(formatData(bookingRes.data.data));
-            setRevenueData(formatData(revenueRes.data.data, "revenue"));
-            setUserData(formatData(userRes.data.data, "users"));
-        } catch (error) {
-            console.log("Error fetching analytics data:", error);
-            // toast.error("Failed to load analytics");
-        } finally {
-            setLoading(false);
+        if (error) {
+            toast.error(error);
+            dispatch(clearAnalyticsErrorAction());
         }
-    };
-
-    // Format API data → chart friendly
-    const formatData = (data, key = "bookings") =>
-        data.map(item => ({
-            date: new Date(item.date).toLocaleDateString(),
-            [key]: item[key] ?? item.users ?? item.bookings
-        }));
-
-    // Format monthly data (YYYY-MM format)
-    const formatMonthlyData = (data, valueKey) =>
-        data.map(item => ({
-            month: item.month,
-            value: item[valueKey],
-            [valueKey]: item[valueKey]
-        }));
-
-    // Format daily data (YYYY-MM-DD format)
-    const formatDailyData = (data, valueKey) =>
-        data.map(item => ({
-            date: new Date(item.date).toLocaleDateString(),
-            value: item[valueKey],
-            [valueKey]: item[valueKey]
-        }));
-
-    // Format hourly data (0-23 hours)
-    const formatHourlyData = (data) =>
-        data.map(item => ({
-            hour: `${item.hour}:00`,
-            bookings: item.bookings,
-            value: item.bookings
-        }));
+    }, [error, dispatch]);
 
     // Color palette for charts
     const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'];
-
-    // Trend filter (daily / monthly)
-    const filterTrend = (data) => {
-        if (range === "daily") return data;
-
-        const map = {};
-        data.forEach(d => {
-            const month = d.date.slice(3); // MM/YYYY
-            map[month] = (map[month] || 0) + Object.values(d)[1];
-        });
-
-        return Object.keys(map).map(k => ({
-            date: k,
-            value: map[k]
-        }));
-    };
 
     // Handle post click to show details
     const handlePostClick = (post) => {

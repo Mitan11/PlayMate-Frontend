@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { assets } from "../assets/assets";
-import { useContext } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
-import { AppContext } from "../context/AppContextProvider";
+import { selectAuthToken, selectAuthUser } from "../redux/auth/authSelectors";
+import { logout as logoutAction } from "../redux/auth/authSlice";
 import Box from "@mui/joy/Box";
 import Typography from "@mui/joy/Typography";
 import IconButton from "@mui/joy/IconButton";
@@ -14,19 +15,19 @@ import Avatar from "@mui/joy/Avatar";
 import Divider from "@mui/joy/Divider";
 
 function Navbar() {
-    const { aToken, setaToken } = useContext(AppContext);
+    const dispatch = useDispatch();
     const navigate = useNavigate();
+    const token = useSelector(selectAuthToken);
+    const adminUser = useSelector(selectAuthUser);
     const [anchorEl, setAnchorEl] = useState(null);
 
     const handleMenuToggle = (event) => {
         setAnchorEl((prev) => (prev ? null : event.currentTarget));
     };
 
-
-    const logout = () => {
-        if (aToken) {
-            setaToken("");
-            localStorage.removeItem("aToken");
+    const handleLogout = () => {
+        if (token) {
+            dispatch(logoutAction());
             toast.success("Logout successful");
             setAnchorEl(null);
             navigate("/");
@@ -114,14 +115,14 @@ function Navbar() {
                             color="primary"
                             sx={{ fontSize: "0.875rem" }}
                         >
-                            A
+                            {adminUser?.user_email?.charAt(0).toUpperCase() || "A"}
                         </Avatar>
                         <Box>
                             <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                                Admin User
+                                {adminUser?.user_email || "Admin User"}
                             </Typography>
                             <Typography level="body-xs" sx={{ color: "neutral.400", fontSize: "0.75rem" }}>
-                                Administrator
+                                {adminUser?.role || "Administrator"}
                             </Typography>
                         </Box>
                     </Box>
@@ -161,7 +162,7 @@ function Navbar() {
                         sx={{ zIndex: 1000 }}
                     >
                         <MenuItem
-                            onClick={logout}
+                            onClick={handleLogout}
                             sx={{
                                 display: "flex",
                                 gap: 1.5,

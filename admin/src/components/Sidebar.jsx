@@ -1,13 +1,14 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import NavItem from "../components/NavItem";
-import { AppContext } from "../context/AppContextProvider";
 import { assets } from "../assets/assets";
 import Box from "@mui/joy/Box";
 import Tooltip from "@mui/joy/Tooltip";
+import { selectAuthToken } from "../redux/auth/authSelectors";
 
 function Sidebar() {
-    const { aToken } = useContext(AppContext);
+    const token = useSelector(selectAuthToken);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
     useEffect(() => {
@@ -18,7 +19,7 @@ function Sidebar() {
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    if (!aToken) return null;
+    if (!token) return null;
 
     return (
         <motion.aside

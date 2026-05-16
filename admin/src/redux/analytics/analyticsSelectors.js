@@ -1,0 +1,17 @@
+export const selectAnalyticsBookingData = (state) => state.analytics.bookingData;
+export const selectAnalyticsRevenueData = (state) => state.analytics.revenueData;
+export const selectAnalyticsUserData = (state) => state.analytics.userData;
+export const selectUserGrowthData = (state) => state.analytics.userGrowthData;
+export const selectVenueGrowthData = (state) => state.analytics.venueGrowthData;
+export const selectBookingTrendData = (state) => state.analytics.bookingTrendData;
+export const selectMonthlyRevenueData = (state) => state.analytics.monthlyRevenueData;
+export const selectRevenueByVenueData = (state) => state.analytics.revenueByVenueData;
+export const selectRevenueBySportData = (state) => state.analytics.revenueBySportData;
+export const selectMostPlayedSportsData = (state) => state.analytics.mostPlayedSportsData;
+export const selectMostBookedVenuesData = (state) => state.analytics.mostBookedVenuesData;
+export const selectPeakBookingHoursData = (state) => state.analytics.peakBookingHoursData;
+export const selectTopUsersByBookingsData = (state) => state.analytics.topUsersByBookingsData;
+export const selectMostLikedPostsData = (state) => state.analytics.mostLikedPostsData;
+export const selectTopContentCreatorsData = (state) => state.analytics.topContentCreatorsData;
+export const selectAnalyticsStatus = (state) => state.analytics.status;
+export const selectAnalyticsError = (state) => state.analytics.error;

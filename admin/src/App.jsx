@@ -1,5 +1,5 @@
-import { useContext } from "react";
-import { AppContext } from "./context/AppContextProvider";
+import { useSelector } from "react-redux";
+import { selectAuthToken } from "./redux/auth/authSelectors";
 import Login from "./pages/Login";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
@@ -12,55 +12,52 @@ import UsersManagement from "./pages/UsersManagement";
 import VenueManagement from "./pages/VenueManagement";
 import PostsManagement from "./pages/PostsManagement";
 import NotFound from "./components/NotFound";
+import PrivateRoute from "./components/PrivateRoute";
 
 export default function App() {
-    const { aToken } = useContext(AppContext);
+    const token = useSelector(selectAuthToken);
 
     return (
-        aToken ? (
+        <Box
+            sx={{
+                display: "flex",
+                flexDirection: "column",
+                height: "100vh",
+                width: "100vw",
+                overflow: "hidden",
+                backgroundColor: "#F8F9FD",
+            }}
+        >
+            {token && <Navbar />}
             <Box
                 sx={{
                     display: "flex",
-                    flexDirection: "column",
-                    height: "100vh",
-                    width: "100vw",
+                    flex: 1,
+                    width: "100%",
                     overflow: "hidden",
-                    backgroundColor: "#F8F9FD",
                 }}
             >
-                <Navbar />
+                {token && <Sidebar />}
                 <Box
                     sx={{
-                        display: "flex",
                         flex: 1,
                         width: "100%",
-                        overflow: "hidden",
+                        overflowY: "auto",
+                        overflowX: "hidden",
                     }}
                 >
-                    <Sidebar />
-                    <Box
-                        sx={{
-                            flex: 1,
-                            width: "100%",
-                            overflowY: "auto",
-                            overflowX: "hidden",
-                        }}
-                    >
-                        <Routes>
-                            <Route path="/" element={<Navigate to="/admin-dashboard" />} />
-                            <Route path="/admin-dashboard" element={<Dashboard />} />
-                            <Route path="/sports-management" element={<SportsManagement />} />
-                            <Route path="/admin/analytics" element={<AdminAnalytics />} />
-                            <Route path="/users-management" element={<UsersManagement />} />
-                            <Route path="/venue-management" element={<VenueManagement />} />
-                            <Route path="/posts-management" element={<PostsManagement />} />
-                            <Route path="*" element={<NotFound />} />
-                        </Routes>
-                    </Box>
+                    <Routes>
+                        <Route path="/" element={token ? <Navigate to="/admin-dashboard" /> : <Login />} />
+                        <Route path="/admin-dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                        <Route path="/sports-management" element={<PrivateRoute><SportsManagement /></PrivateRoute>} />
+                        <Route path="/admin/analytics" element={<PrivateRoute><AdminAnalytics /></PrivateRoute>} />
+                        <Route path="/users-management" element={<PrivateRoute><UsersManagement /></PrivateRoute>} />
+                        <Route path="/venue-management" element={<PrivateRoute><VenueManagement /></PrivateRoute>} />
+                        <Route path="/posts-management" element={<PrivateRoute><PostsManagement /></PrivateRoute>} />
+                        <Route path="*" element={<NotFound />} />
+                    </Routes>
                 </Box>
             </Box>
-        ) : (
-            <Login />
-        )
+        </Box>
     );
 }

@@ -1,20 +1,26 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import axios from 'axios'
 import toast from 'react-hot-toast'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Button from '@mui/joy/Button'
 import DataTable from '../components/DataTable'
 import Modal from '../components/Modalbox'
-import { AppContext } from '../context/AppContextProvider'
+import { useDispatch, useSelector } from 'react-redux'
+import {
+    selectUsers,
+    selectUsersError,
+    selectUsersStatus,
+} from '../redux/users/usersSelectors'
+import { fetchUsers, removeUser } from '../redux/users/usersThunks'
+import { clearUsersError } from '../redux/users/usersSlice'
 
 function UsersManagement() {
-    const { backendUrl, aToken } = useContext(AppContext)
-
-    const [users, setUsers] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState(null)
+    const dispatch = useDispatch()
+    const users = useSelector(selectUsers)
+    const status = useSelector(selectUsersStatus)
+    const error = useSelector(selectUsersError)
+    const loading = status === 'loading'
     const [openModal, setOpenModal] = useState(false)
     const [selectedUser, setSelectedUser] = useState({ id: null, name: '' })
 
@@ -27,34 +33,16 @@ function UsersManagement() {
         },
     }
 
-    const fetchUsers = useCallback(async () => {
-        try {
-            setLoading(true)
-            setError(null)
-
-            const response = await axios.get(`${backendUrl}/admin/getAllUsers`, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            })
-            console.log('Fetch Users Response:', response.data)
-            if (response.data?.status) {
-                setUsers(response.data.data || [])
-            } else {
-                throw new Error('Failed to fetch users')
-            }
-        } catch (err) {
-            const message = err.response?.data?.message || 'Failed to fetch users'
-            setError(message)
-            toast.error(message)
-        } finally {
-            setLoading(false)
-        }
-    }, [backendUrl, aToken])
+    useEffect(() => {
+        dispatch(fetchUsers())
+    }, [dispatch])
 
     useEffect(() => {
-        fetchUsers()
-    }, [fetchUsers])
+        if (error) {
+            toast.error(error)
+            dispatch(clearUsersError())
+        }
+    }, [error, dispatch])
 
     const columns = useMemo(
         () => [
@@ -122,28 +110,16 @@ function UsersManagement() {
         if (!selectedUser.id) return
 
         try {
-            setLoading(true)
-            const response = await axios.delete(`${backendUrl}/admin/deleteUser/${selectedUser.id}`, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            })
-
-            if (response.data?.status) {
-                toast.success('User deleted successfully')
-                fetchUsers()
-            } else {
-                throw new Error('Failed to delete user')
-            }
+            await dispatch(removeUser(selectedUser.id)).unwrap()
+            toast.success('User deleted successfully')
+            dispatch(fetchUsers())
         } catch (err) {
-            const message = err.response?.data?.message || 'Failed to delete user'
-            toast.error(message)
+            console.error('Failed to delete user:', err)
         } finally {
-            setLoading(false)
             setOpenModal(false)
             setSelectedUser({ id: null, name: '' })
         }
-    }, [backendUrl, aToken, selectedUser.id, fetchUsers])
+    }, [dispatch, selectedUser.id])
 
     const handleCancelDelete = useCallback(() => {
         setOpenModal(false)

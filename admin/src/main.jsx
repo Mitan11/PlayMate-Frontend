@@ -3,13 +3,14 @@ import './index.css'
 import App from './App.jsx'
 import { BrowserRouter } from 'react-router'
 import { Toaster } from 'react-hot-toast'
-import AppContextProvider from './context/AppContextProvider.jsx'
+import { Provider } from 'react-redux'
+import { store } from './redux/store.js'
 
 createRoot(document.getElementById('root')).render(
-  <BrowserRouter>
-    <AppContextProvider>
+  <Provider store={store}>
+    <BrowserRouter>
       <App />
       <Toaster />
-    </AppContextProvider>
-  </BrowserRouter>,
+    </BrowserRouter>
+  </Provider>,
 )

@@ -1,22 +1,34 @@
-import React, { useEffect, useState, useContext, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import Box from "@mui/joy/Box";
 import { motion } from 'framer-motion';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import DataTable from '../components/DataTable';
-import { AppContext } from '../context/AppContextProvider';
 import Typography from "@mui/joy/Typography";
 import Modal from '../components/Modalbox';
 import FormControl from '@mui/joy/FormControl';
 import FormLabel from '@mui/joy/FormLabel';
 import Input from '@mui/joy/Input';
 import { Button } from '@mui/joy';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+    addSport,
+    deleteSport as deleteSportThunk,
+    fetchSports,
+    updateSport,
+} from '../redux/sports/sportsThunks';
+import {
+    selectSports,
+    selectSportsError,
+    selectSportsStatus,
+} from '../redux/sports/sportsSelectors';
+import { clearSportsError } from '../redux/sports/sportsSlice';
 
 function SportsManagement() {
-    const { backendUrl, aToken } = useContext(AppContext);
-    const [sports, setSports] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const dispatch = useDispatch();
+    const sports = useSelector(selectSports);
+    const status = useSelector(selectSportsStatus);
+    const error = useSelector(selectSportsError);
+    const loading = status === 'loading';
     const [openModal, setOpenModal] = useState(false);
     const [selectedSportId, setSelectedSportId] = useState(null);
     const [openEditModal, setOpenEditModal] = useState(false);
@@ -34,34 +46,16 @@ function SportsManagement() {
         },
     };
 
-    // Fetch sports data
-    const fetchSports = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await axios.get(`${backendUrl}/admin/getAllSports`, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            });
-
-            if (response.data?.status) {
-                setSports(response.data.data || []);
-            } else {
-                throw new Error('Failed to fetch sports');
-            }
-        } catch (err) {
-            const message = err.response?.data?.message || 'Failed to fetch sports';
-            setError(message);
-            toast.error(message);
-        } finally {
-            setLoading(false);
-        }
-    }, [backendUrl, aToken]);
+    useEffect(() => {
+        dispatch(fetchSports());
+    }, [dispatch]);
 
     useEffect(() => {
-        fetchSports();
-    }, [fetchSports]);
+        if (error) {
+            toast.error(error);
+            dispatch(clearSportsError());
+        }
+    }, [error, dispatch]);
 
     // Define columns
     const columns = useMemo(() => [
@@ -90,32 +84,20 @@ function SportsManagement() {
         setOpenModal(true);
     }, []);
 
-    const deleteSport = useCallback(async () => {
+    const handleDeleteSubmit = useCallback(async () => {
         if (!selectedSportId) return;
 
         try {
-            setLoading(true);
-            const response = await axios.delete(`${backendUrl}/admin/deleteSport/${selectedSportId}`, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            });
-            if (response.data?.status) {
-                toast.success('Sport deleted successfully');
-                fetchSports();
-            }
-            else {
-                throw new Error('Failed to delete sport');
-            }
+            await dispatch(deleteSportThunk(selectedSportId)).unwrap();
+            toast.success('Sport deleted successfully');
+            dispatch(fetchSports());
         } catch (err) {
-            const message = err.response?.data?.message || 'Failed to delete sport';
-            toast.error(message);
+            console.error('Failed to delete sport:', err);
         } finally {
-            setLoading(false);
             setOpenModal(false);
             setSelectedSportId(null);
         }
-    }, [backendUrl, aToken, selectedSportId, fetchSports]);
+    }, [dispatch, selectedSportId]);
 
     const handleCancelDelete = useCallback(() => {
         setOpenModal(false);
@@ -139,31 +121,20 @@ function SportsManagement() {
         }
 
         try {
-            setLoading(true);
-            const response = await axios.patch(`${backendUrl}/admin/updateSport/${editingSport.sport_id}`, {
-                sport_name: editFormData.sport_name.trim()
-            }, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            });
-
-            if (response.data?.status) {
-                toast.success('Sport updated successfully');
-                fetchSports();
-                setOpenEditModal(false);
-                setEditingSport(null);
-                setEditFormData({ sport_name: '' });
-            } else {
-                throw new Error('Failed to update sport');
-            }
+            await dispatch(updateSport({
+                sportId: editingSport.sport_id,
+                sportName: editFormData.sport_name.trim(),
+            })).unwrap();
+            toast.success('Sport updated successfully');
+            dispatch(fetchSports());
+            setOpenEditModal(false);
+            setEditingSport(null);
+            setEditFormData({ sport_name: '' });
         } catch (err) {
-            const message = err.response?.data?.message || 'Failed to update sport';
-            toast.error(message);
+            console.error('Failed to update sport:', err);
         } finally {
-            setLoading(false);
         }
-    }, [backendUrl, aToken, editingSport, editFormData, fetchSports]);
+    }, [dispatch, editingSport, editFormData]);
 
     const handleCancelEdit = useCallback(() => {
         setOpenEditModal(false);
@@ -187,30 +158,16 @@ function SportsManagement() {
         }
 
         try {
-            setLoading(true);
-            const response = await axios.post(`${backendUrl}/admin/addSport`, {
-                sport_name: addFormData.sport_name.trim()
-            }, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            });
-
-            if (response.data?.status) {
-                toast.success('Sport added successfully');
-                fetchSports();
-                setAddModalOpen(false);
-                setAddFormData({ sport_name: '' });
-            } else {
-                throw new Error('Failed to add sport');
-            }
+            await dispatch(addSport(addFormData.sport_name.trim())).unwrap();
+            toast.success('Sport added successfully');
+            dispatch(fetchSports());
+            setAddModalOpen(false);
+            setAddFormData({ sport_name: '' });
         } catch (err) {
-            const message = err.response?.data?.message || 'Failed to add sport';
-            toast.error(message);
+            console.error('Failed to add sport:', err);
         } finally {
-            setLoading(false);
         }
-    }, [backendUrl, aToken, addFormData, fetchSports]);
+    }, [dispatch, addFormData]);
 
     const handleCancelAdd = useCallback(() => {
         setAddModalOpen(false);
@@ -246,7 +203,7 @@ function SportsManagement() {
                     open={openModal}
                     setOpen={setOpenModal}
                     title="Confirm Delete"
-                    onConfirm={deleteSport}
+                    onConfirm={handleDeleteSubmit}
                     onCancel={handleCancelDelete}
                     confirmText="Delete"
                     cancelText="Cancel"

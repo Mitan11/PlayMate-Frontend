@@ -543,6 +543,19 @@ class _BookingScreenState extends State<BookingScreen> {
       // Always send API datetimes in 24h format, even when UI displays 12h.
       final startTime = _slotStartTimes[_selectedSlot!] ?? '00:00';
       final endTime = _slotEndTimes[_selectedSlot!] ?? '00:00';
+      
+      // Validation: both times shouldn't be midnight (00:00)
+      if (startTime == '00:00' && endTime == '00:00') {
+        if (!mounted) return;
+        setState(() => _isProcessingPayment = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid slot selected. Please select a valid time slot.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
 
       final startDatetime = '$dateStr $startTime:00';
       final endDatetime = '$dateStr $endTime:00';
@@ -847,10 +860,21 @@ class _BookingScreenState extends State<BookingScreen> {
                   'recommendationReason': '',
                 });
               } else {
+                // Try to parse a single time (e.g., "2:00 PM") and add 1 hour as end time
+                final start24 = _to24Hour(raw);
+                final start24Parts = start24.split(':');
+                String end24 = start24;
+                if (start24Parts.length == 2) {
+                  final hour = int.tryParse(start24Parts[0]) ?? 0;
+                  final minute = int.tryParse(start24Parts[1]) ?? 0;
+                  final endHour = ((hour + 1) % 24).toString().padLeft(2, '0');
+                  end24 = '$endHour:${minute.toString().padLeft(2, '0')}';
+                }
+                final slotDisplay = '${_to12Hour(start24)} to ${_to12Hour(end24)}';
                 slotInfoList.add({
-                  'slotTime': raw,
-                  'start': null,
-                  'end': null,
+                  'slotTime': slotDisplay,
+                  'start': start24,
+                  'end': end24,
                   'priceData': null,
                   'slotId': null,
                   'isRecommended': false,
@@ -901,6 +925,8 @@ class _BookingScreenState extends State<BookingScreen> {
               }
             }
             debugPrint('Loaded ${_slots.length} slots with prices: $_slotPrices');
+            debugPrint('Slot start times: $_slotStartTimes');
+            debugPrint('Slot end times: $_slotEndTimes');
           });
         } else {
           debugPrint('No slots found in response structure.');
@@ -1292,127 +1318,126 @@ class _BookingScreenState extends State<BookingScreen> {
                         const SizedBox(height: 12),
 
                         // Time Slots
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: _isLoadingSlots
-                              ? [
-                                  const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(20.0),
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                  ),
-                                ]
-                              : _slots.isEmpty
-                              ? [
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      'No slots available',
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ),
-                                ]
-                              : _slots.map((slot) {
-                                  final isSelected = _selectedSlot == slot;
-                                  final slotPrice = _slotPrices[slot] ?? 0.0;
-                                  final isRecommended =
-                                      _slotRecommended[slot] == true;
-                                  final recommendationReason =
-                                      _slotRecommendationReason[slot] ?? '';
+                        if (_isLoadingSlots)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        else if (_slots.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              'No slots available',
+                              style: GoogleFonts.poppins(color: Colors.grey),
+                            ),
+                          )
+                        else
+                          SizedBox(
+                            height: 96,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _slots.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                final slot = _slots[index];
+                                final isSelected = _selectedSlot == slot;
+                                final slotPrice = _slotPrices[slot] ?? 0.0;
+                                final isRecommended =
+                                    _slotRecommended[slot] == true;
 
-                                  return GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _selectedSlot = slot;
-                                      });
-                                      _fetchPriceData();
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedSlot = slot;
+                                    });
+                                    _fetchPriceData();
+                                  },
+                                  child: Container(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 156,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? themeColor
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
                                         color: isSelected
                                             ? themeColor
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: isSelected
-                                              ? themeColor
-                                              : Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            slot,
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: isSelected
-                                                  ? Colors.white
-                                                  : Colors.black87,
-                                            ),
-                                          ),
-                                          if (isRecommended) ...[
-                                            const SizedBox(height: 4),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: isSelected
-                                                    ? Colors.white.withOpacity(
-                                                        0.22,
-                                                      )
-                                                    : const Color(0xFFE8F5E9),
-                                                borderRadius:
-                                                    BorderRadius.circular(999),
-                                              ),
-                                              child: Text(
-                                                'Recommended',
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: isSelected
-                                                      ? Colors.white
-                                                      : themeColor,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                          if (slotPrice > 0) ...[
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'INR ${slotPrice.toStringAsFixed(0)}',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w500,
-                                                color: isSelected
-                                                    ? Colors.white.withOpacity(
-                                                        0.9,
-                                                      )
-                                                    : Colors.grey.shade600,
-                                              ),
-                                            ),
-                                          ],
-                                        ],
+                                            : Colors.grey.shade300,
                                       ),
                                     ),
-                                  );
-                                }).toList(),
-                        ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          slot,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : Colors.black87,
+                                          ),
+                                        ),
+                                        if (isRecommended) ...[
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isSelected
+                                                  ? Colors.white.withOpacity(
+                                                      0.22,
+                                                    )
+                                                  : const Color(0xFFE8F5E9),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              'Recommended',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: isSelected
+                                                    ? Colors.white
+                                                    : themeColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                        if (slotPrice > 0) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'INR ${slotPrice.toStringAsFixed(0)}',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                              color: isSelected
+                                                  ? Colors.white.withOpacity(
+                                                      0.9,
+                                                    )
+                                                  : Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
 
                         // Price Breakdown Section - Only show if price data is loaded
                         if (_selectedSlot != null &&

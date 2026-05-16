@@ -1,31 +1,44 @@
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaEye, FaEyeSlash, FaArrowRight } from "react-icons/fa";
-import { AppContext } from "../context/AppContextProvider";
-import axios from "axios";
+import { adminLogin } from "../redux/auth/authThunks";
+import {
+    selectAuthStatus,
+    selectAuthError,
+    selectAuthToken,
+} from "../redux/auth/authSelectors";
 import { toast } from "react-hot-toast";
 
 export default function Login() {
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const { backendUrl, setaToken } = useContext(AppContext);
-
     const [errors, setErrors] = useState({ email: "", password: "" });
-    const [isLoading, setIsLoading] = useState(false);
+
+    const status = useSelector(selectAuthStatus);
+    const error = useSelector(selectAuthError);
+    const token = useSelector(selectAuthToken);
+    const isLoading = status === "loading";
 
     useEffect(() => {
         document.title = "PlayMate | Admin Login";
     }, []);
 
     useEffect(() => {
-        const token = localStorage.getItem("aToken");
         if (token) {
             navigate("/admin-dashboard", { replace: true });
         }
-    }, [navigate]);
+    }, [token, navigate]);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+        }
+    }, [error]);
 
     const validateForm = () => {
         let isValid = true;
@@ -39,16 +52,14 @@ export default function Login() {
             isValid = false;
         }
 
-
         if (password.trim() === "") {
             isValid = false;
             newErrors.password = "Password is required";
         }
 
         setErrors(newErrors);
-
         return isValid;
-    }
+    };
 
     const onSubmitHandler = async (e) => {
         e.preventDefault();
@@ -57,36 +68,22 @@ export default function Login() {
 
         if (!validateForm()) return;
 
-        setIsLoading(true);
-
         try {
-            const response = await axios.post(`${backendUrl}/admin/admin-login`,
-                { email: email.trim().toLowerCase(), password: password.trim() });
-            console.log(response);
-            const aToken = response.data.token;
+            const result = await dispatch(
+                adminLogin({ email, password })
+            ).unwrap();
 
-            if (!aToken) {
-                throw new Error("Invalid login response");
+            if (result.token) {
+                navigate("/admin-dashboard");
+                toast.success("Login successful");
+                setEmail("");
+                setPassword("");
+                setErrors({ email: "", password: "" });
             }
-
-            setaToken(aToken);
-            localStorage.setItem("aToken", aToken);
-
-            navigate("/admin-dashboard");
-            toast.success("Login successful");
-            setEmail("");
-            setPassword("");
-            setErrors({ email: "", password: "" });
-        } catch (error) {
-            const message =
-                error?.response?.data?.message ||
-                "Something went wrong. Please try again.";
-            toast.error(message);
-        } finally {
-            setIsLoading(false);
+        } catch (err) {
+            console.error("Login error:", err);
         }
-
-    }
+    };
 
     const containerVariants = {
         hidden: { opacity: 0, y: 20 },

@@ -1,20 +1,26 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import axios from 'axios'
 import toast from 'react-hot-toast'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Button from '@mui/joy/Button'
 import DataTable from '../components/DataTable'
 import Modal from '../components/Modalbox'
-import { AppContext } from '../context/AppContextProvider'
+import { useDispatch, useSelector } from 'react-redux'
+import {
+    selectVenues,
+    selectVenuesError,
+    selectVenuesStatus,
+} from '../redux/venues/venuesSelectors'
+import { fetchVenues, removeVenue } from '../redux/venues/venuesThunks'
+import { clearVenuesError as clearVenuesErrorAction } from '../redux/venues/venuesSlice'
 
 function VenueManagement() {
-    const { backendUrl, aToken } = useContext(AppContext)
-
-    const [venues, setVenues] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState(null)
+    const dispatch = useDispatch()
+    const venues = useSelector(selectVenues)
+    const status = useSelector(selectVenuesStatus)
+    const error = useSelector(selectVenuesError)
+    const loading = status === 'loading'
     const [openModal, setOpenModal] = useState(false)
     const [selectedVenue, setSelectedVenue] = useState({ id: null, name: '' })
 
@@ -27,34 +33,16 @@ function VenueManagement() {
         },
     }
 
-    const fetchVenues = useCallback(async () => {
-        try {
-            setLoading(true)
-            setError(null)
-
-            const response = await axios.get(`${backendUrl}/admin/getVenues`, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            })
-
-            if (response.data?.status) {
-                setVenues(response.data.data || [])
-            } else {
-                throw new Error('Failed to fetch venues')
-            }
-        } catch (err) {
-            const message = err.response?.data?.message || 'Failed to fetch venues'
-            setError(message)
-            toast.error(message)
-        } finally {
-            setLoading(false)
-        }
-    }, [backendUrl, aToken])
+    useEffect(() => {
+        dispatch(fetchVenues())
+    }, [dispatch])
 
     useEffect(() => {
-        fetchVenues()
-    }, [fetchVenues])
+        if (error) {
+            toast.error(error)
+            dispatch(clearVenuesErrorAction())
+        }
+    }, [error, dispatch])
 
     const columns = useMemo(
         () => [
@@ -125,28 +113,16 @@ function VenueManagement() {
         if (!selectedVenue.id) return
 
         try {
-            setLoading(true)
-            const response = await axios.delete(`${backendUrl}/admin/deleteVenue/${selectedVenue.id}`, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            })
-
-            if (response.data?.status) {
-                toast.success('Venue deleted successfully')
-                fetchVenues()
-            } else {
-                throw new Error('Failed to delete venue')
-            }
+            await dispatch(removeVenue(selectedVenue.id)).unwrap()
+            toast.success('Venue deleted successfully')
+            dispatch(fetchVenues())
         } catch (err) {
-            const message = err.response?.data?.message || 'Failed to delete venue'
-            toast.error(message)
+            console.error('Failed to delete venue:', err)
         } finally {
-            setLoading(false)
             setOpenModal(false)
             setSelectedVenue({ id: null, name: '' })
         }
-    }, [backendUrl, aToken, selectedVenue.id, fetchVenues])
+    }, [dispatch, selectedVenue.id])
 
     const handleCancelDelete = useCallback(() => {
         setOpenModal(false)
@@ -204,7 +180,7 @@ function VenueManagement() {
                             variant="outlined"
                             color="neutral"
                             loading={loading}
-                            onClick={fetchVenues}
+                            onClick={() => dispatch(fetchVenues())}
                         >
                             Refresh
                         </Button>

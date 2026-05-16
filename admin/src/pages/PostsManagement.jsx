@@ -1,6 +1,5 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import axios from 'axios'
 import toast from 'react-hot-toast'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
@@ -8,15 +7,22 @@ import Button from '@mui/joy/Button'
 import Chip from '@mui/joy/Chip'
 import DataTable from '../components/DataTable'
 import Modal from '../components/Modalbox'
-import { AppContext } from '../context/AppContextProvider'
+import { useDispatch, useSelector } from 'react-redux'
 import { assets } from '../assets/assets';
+import {
+    selectPosts,
+    selectPostsError,
+    selectPostsStatus,
+} from '../redux/posts/postsSelectors'
+import { clearPostsError as clearPostsErrorAction } from '../redux/posts/postsSlice'
+import { fetchPosts, removePost } from '../redux/posts/postsThunks'
 
 function PostsManagement() {
-    const { backendUrl, aToken } = useContext(AppContext)
-
-    const [posts, setPosts] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState(null)
+    const dispatch = useDispatch()
+    const posts = useSelector(selectPosts)
+    const status = useSelector(selectPostsStatus)
+    const error = useSelector(selectPostsError)
+    const loading = status === 'loading'
     const [openDeleteModal, setOpenDeleteModal] = useState(false)
     const [openViewModal, setOpenViewModal] = useState(false)
     const [selectedPost, setSelectedPost] = useState({ id: null, content: '' })
@@ -31,34 +37,16 @@ function PostsManagement() {
         },
     }
 
-    const fetchPosts = useCallback(async () => {
-        try {
-            setLoading(true)
-            setError(null)
-
-            const response = await axios.get(`${backendUrl}/admin/getAllPosts`, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            })
-
-            if (response.data?.status) {
-                setPosts(response.data.data || [])
-            } else {
-                throw new Error('Failed to fetch posts')
-            }
-        } catch (err) {
-            const message = err.response?.data?.message || 'Failed to fetch posts'
-            setError(message)
-            toast.error(message)
-        } finally {
-            setLoading(false)
-        }
-    }, [backendUrl, aToken])
+    useEffect(() => {
+        dispatch(fetchPosts())
+    }, [dispatch])
 
     useEffect(() => {
-        fetchPosts()
-    }, [fetchPosts])
+        if (error) {
+            toast.error(error)
+            dispatch(clearPostsErrorAction())
+        }
+    }, [error, dispatch])
 
     const columns = useMemo(
         () => [
@@ -171,28 +159,16 @@ function PostsManagement() {
         if (!selectedPost.id) return
 
         try {
-            setLoading(true)
-            const response = await axios.delete(`${backendUrl}/admin/deletePost/${selectedPost.id}`, {
-                headers: {
-                    Authorization: `Bearer ${aToken}`,
-                },
-            })
-
-            if (response.data?.status) {
-                toast.success('Post deleted successfully')
-                fetchPosts()
-            } else {
-                throw new Error('Failed to delete post')
-            }
+            await dispatch(removePost(selectedPost.id)).unwrap()
+            toast.success('Post deleted successfully')
+            dispatch(fetchPosts())
         } catch (err) {
-            const message = err.response?.data?.message || 'Failed to delete post'
-            toast.error(message)
+            console.error('Failed to delete post:', err)
         } finally {
-            setLoading(false)
             setOpenDeleteModal(false)
             setSelectedPost({ id: null, content: '' })
         }
-    }, [backendUrl, aToken, selectedPost.id, fetchPosts])
+    }, [dispatch, selectedPost.id])
 
     const handleCancelDelete = useCallback(() => {
         setOpenDeleteModal(false)
@@ -326,7 +302,7 @@ function PostsManagement() {
                             variant="outlined"
                             color="neutral"
                             loading={loading}
-                            onClick={fetchPosts}
+                            onClick={() => dispatch(fetchPosts())}
                         >
                             Refresh
                         </Button>
