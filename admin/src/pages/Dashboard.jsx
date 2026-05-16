@@ -15,9 +15,9 @@ import {
     selectDashboardSportMetrics,
     selectDashboardStats,
     selectDashboardStatus,
-} from "../redux/dashboard/dashboardSelectors";
-import { clearDashboardError as clearDashboardErrorAction } from "../redux/dashboard/dashboardSlice";
-import { fetchDashboardData } from "../redux/dashboard/dashboardThunks";
+} from "../features/dashboard/dashboardSelectors";
+import { clearDashboardError as clearDashboardErrorAction } from "../features/dashboard/dashboardSlice";
+import { fetchDashboardData } from "../features/dashboard/dashboardThunks";
 
 function Dashboard() {
     const navigate = useNavigate();

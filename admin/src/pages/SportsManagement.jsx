@@ -15,13 +15,13 @@ import {
     deleteSport as deleteSportThunk,
     fetchSports,
     updateSport,
-} from '../redux/sports/sportsThunks';
+} from '../features/sports/sportsThunks';
 import {
     selectSports,
     selectSportsError,
     selectSportsStatus,
-} from '../redux/sports/sportsSelectors';
-import { clearSportsError } from '../redux/sports/sportsSlice';
+} from '../features/sports/sportsSelectors';
+import { clearSportsError } from '../features/sports/sportsSlice';
 
 function SportsManagement() {
     const dispatch = useDispatch();

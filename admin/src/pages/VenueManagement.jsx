@@ -11,9 +11,9 @@ import {
     selectVenues,
     selectVenuesError,
     selectVenuesStatus,
-} from '../redux/venues/venuesSelectors'
-import { fetchVenues, removeVenue } from '../redux/venues/venuesThunks'
-import { clearVenuesError as clearVenuesErrorAction } from '../redux/venues/venuesSlice'
+} from '../features/venues/venuesSelectors'
+import { fetchVenues, removeVenue } from '../features/venues/venuesThunks'
+import { clearVenuesError as clearVenuesErrorAction } from '../features/venues/venuesSlice'
 
 function VenueManagement() {
     const dispatch = useDispatch()

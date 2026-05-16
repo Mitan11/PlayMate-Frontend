@@ -11,9 +11,9 @@ import {
     selectUsers,
     selectUsersError,
     selectUsersStatus,
-} from '../redux/users/usersSelectors'
-import { fetchUsers, removeUser } from '../redux/users/usersThunks'
-import { clearUsersError } from '../redux/users/usersSlice'
+} from '../features/users/usersSelectors'
+import { fetchUsers, removeUser } from '../features/users/usersThunks'
+import { clearUsersError } from '../features/users/usersSlice'
 
 function UsersManagement() {
     const dispatch = useDispatch()

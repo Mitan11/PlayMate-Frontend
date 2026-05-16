@@ -3,12 +3,12 @@ import { useNavigate } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaEye, FaEyeSlash, FaArrowRight } from "react-icons/fa";
-import { adminLogin } from "../redux/auth/authThunks";
+import { adminLogin } from "../features/auth/authThunks";
 import {
     selectAuthStatus,
     selectAuthError,
     selectAuthToken,
-} from "../redux/auth/authSelectors";
+} from "../features/auth/authSelectors";
 import { toast } from "react-hot-toast";
 
 export default function Login() {

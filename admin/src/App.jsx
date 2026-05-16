@@ -1,5 +1,5 @@
 import { useSelector } from "react-redux";
-import { selectAuthToken } from "./redux/auth/authSelectors";
+import { selectAuthToken } from "./features/auth/authSelectors";
 import Login from "./pages/Login";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";

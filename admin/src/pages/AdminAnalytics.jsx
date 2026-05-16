@@ -37,9 +37,9 @@ import {
     selectTopUsersByBookingsData,
     selectUserGrowthData,
     selectVenueGrowthData,
-} from "../redux/analytics/analyticsSelectors";
-import { fetchAnalytics } from "../redux/analytics/analyticsThunks";
-import { clearAnalyticsError as clearAnalyticsErrorAction } from "../redux/analytics/analyticsSlice";
+} from "../features/analytics/analyticsSelectors";
+import { fetchAnalytics } from "../features/analytics/analyticsThunks";
+import { clearAnalyticsError as clearAnalyticsErrorAction } from "../features/analytics/analyticsSlice";
 
 function AdminAnalytics() {
     const dispatch = useDispatch();

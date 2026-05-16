@@ -13,9 +13,9 @@ import {
     selectPosts,
     selectPostsError,
     selectPostsStatus,
-} from '../redux/posts/postsSelectors'
-import { clearPostsError as clearPostsErrorAction } from '../redux/posts/postsSlice'
-import { fetchPosts, removePost } from '../redux/posts/postsThunks'
+} from '../features/posts/postsSelectors'
+import { clearPostsError as clearPostsErrorAction } from '../features/posts/postsSlice'
+import { fetchPosts, removePost } from '../features/posts/postsThunks'
 
 function PostsManagement() {
     const dispatch = useDispatch()

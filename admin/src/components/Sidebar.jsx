@@ -5,7 +5,7 @@ import NavItem from "../components/NavItem";
 import { assets } from "../assets/assets";
 import Box from "@mui/joy/Box";
 import Tooltip from "@mui/joy/Tooltip";
-import { selectAuthToken } from "../redux/auth/authSelectors";
+import { selectAuthToken } from "../features/auth/authSelectors";
 
 function Sidebar() {
     const token = useSelector(selectAuthToken);
